@@ -1,0 +1,130 @@
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
+using Minio.Helpers;
+
+namespace Minio.Implementation;
+
+internal class V4RequestAuthenticator : IRequestAuthenticator
+{
+    private readonly IMinioCredentialsProvider _minioCredentialsProvider;
+    private readonly ITimeProvider _timeProvider;
+    private readonly ILogger<V4RequestAuthenticator> _logger;
+
+    public V4RequestAuthenticator(IMinioCredentialsProvider minioCredentialsProvider, ITimeProvider timeProvider, ILogger<V4RequestAuthenticator> logger)
+    {
+        _minioCredentialsProvider = minioCredentialsProvider;
+        _timeProvider = timeProvider;
+        _logger = logger;
+    }
+    
+    public async ValueTask AuthenticateAsync(HttpRequestMessage request, string region, string service, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        
+        var credentials = await _minioCredentialsProvider.GetCredentials(cancellationToken).ConfigureAwait(false);
+        // TODO: Deal with session-token???
+        var authorization = CalculateAuthorization(credentials, region, service, request);
+        request.Headers.Authorization = new AuthenticationHeaderValue("AWS4-HMAC-SHA256", authorization);
+    }
+
+    private string CalculateAuthorization(Credentials credentials, string region, string service, HttpRequestMessage request)
+    {
+        if (request.RequestUri is null) throw new InvalidOperationException("Cannot calculate signature without URI");
+
+        // Use the X-Amz-Date header (if present) to avoid differences between timestamps
+        var signingDate = request.Headers.TryGetValues("X-Amz-Date", out var dateValues) ? dateValues.First() : null;
+        signingDate ??= _timeProvider.UtcNow.ToString("yyyyMMddTHHmmssZ");
+        
+        // Determine canonical URI
+        var canonicalUri = request.RequestUri.AbsolutePath; // TODO: Check if it starts with a '/'
+        if (canonicalUri == string.Empty) canonicalUri = "/";
+        
+        // Determine canonical query
+        var canonicalQueryString = string.Empty;
+        var query = request.RequestUri.Query;
+        if (!string.IsNullOrEmpty(query))
+        {
+            if (query[0] == '?')
+                query = query[1..];
+            var queryItems = query.Split('&', StringSplitOptions.RemoveEmptyEntries);
+            canonicalQueryString = string.Join('&', queryItems.OrderBy(s => s));
+        }
+        
+        // Determine canonical and signed headers
+        var headerItems = new List<string>();
+        var signedHeaderItems = new List<string>();
+        headerItems.Add($"host:{request.RequestUri.Authority}\n");
+        signedHeaderItems.Add("host");
+        foreach (var (name, values) in request.Headers)
+        {
+            var headerName = name.ToLowerInvariant();
+            if (headerName =="content-type" || headerName ==":authority" || headerName.StartsWith("x-amz-", StringComparison.Ordinal))
+            {
+                var coercedValues = new List<string>();
+                foreach (var value in values)
+                    coercedValues.Add(Regex.Replace(value.Trim(), @"\s\s+", " "));
+                var coercedValue = string.Join(',', coercedValues);
+                headerItems.Add($"{headerName}:{coercedValue}\n");
+                signedHeaderItems.Add(headerName);
+            }
+        }
+        headerItems.Sort();
+        signedHeaderItems.Sort();
+        var canonicalHeaders = string.Join("", headerItems);
+        var signedHeaders = string.Join(';', signedHeaderItems);
+        
+        // Use the X-Amz-Content-Sha256 header (if present) to avoid recalculating hashes
+        var payloadHash = request.Headers.TryGetValues("X-Amz-Content-Sha256", out var payloadHashValues) ? payloadHashValues.First() : null;
+        payloadHash ??= SHA256.HashData(request.Content?.ReadAsStream() ?? Stream.Null).ToHexStringLowercase();
+
+        var canonicalRequestBuilder = new StringBuilder();
+        canonicalRequestBuilder.Append(request.Method.Method);
+        canonicalRequestBuilder.Append('\n');
+        canonicalRequestBuilder.Append(canonicalUri);
+        canonicalRequestBuilder.Append('\n');
+        canonicalRequestBuilder.Append(canonicalQueryString);
+        canonicalRequestBuilder.Append('\n');
+        canonicalRequestBuilder.Append(canonicalHeaders);
+        canonicalRequestBuilder.Append('\n');
+        canonicalRequestBuilder.Append(signedHeaders);
+        canonicalRequestBuilder.Append('\n');
+        canonicalRequestBuilder.Append(payloadHash);
+        var canonicalRequest = canonicalRequestBuilder.ToString();
+        if (_logger.IsEnabled(LogLevel.Trace))
+            _logger.LogTrace("Canonical request:\n{CanonicalRequest}", canonicalRequest);
+        
+        var canonicalRequestHash = SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest)).ToHexStringLowercase();
+
+        var stringToSignBuilder = new StringBuilder();
+        stringToSignBuilder.Append("AWS4-HMAC-SHA256\n");
+        stringToSignBuilder.Append($"{signingDate}\n");
+        stringToSignBuilder.Append($"{signingDate[..8]}/{region}/{service}/aws4_request\n");
+        stringToSignBuilder.Append(canonicalRequestHash);
+        var stringToSign = stringToSignBuilder.ToString();
+        if (_logger.IsEnabled(LogLevel.Trace))
+            _logger.LogTrace("StringToSign:\n{StringToSign}", stringToSign);
+
+        var dateKey = HmacSha256($"AWS4{credentials.SecretKey}", signingDate[..8]);
+        var dateRegionKey = HmacSha256(dateKey, region);
+        var dateRegionServiceKey = HmacSha256(dateRegionKey, service); 
+        var signingKey = HmacSha256(dateRegionServiceKey, "aws4_request");
+
+        var signature = HmacSha256(signingKey, stringToSign).ToHexStringLowercase();
+        if (_logger.IsEnabled(LogLevel.Trace))
+            _logger.LogTrace("Signature: {Signature}", signature);
+
+        return $"Credential={credentials.AccessKey}/{signingDate[..8]}/{region}/{service}/aws4_request, SignedHeaders={signedHeaders}, Signature={signature}";
+    }
+
+    private static byte[] HmacSha256(string key, string data) => HmacSha256(Encoding.UTF8.GetBytes(key), data);
+    private static byte[] HmacSha256(byte[] key, string data) => HmacSha256(key, Encoding.UTF8.GetBytes(data));
+    
+    private static byte[] HmacSha256(byte[] key, byte[] data)
+    {
+        using var hmac = new HMACSHA256(key);
+        return hmac.ComputeHash(data);
+    }
+}
