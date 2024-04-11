@@ -22,11 +22,14 @@ internal static class HttpAsserts
     
     private static void AssertHeaders(string errorMessage, HttpHeaders gotHeaders, params string[] expectedHeaders)
     {
+#pragma warning disable CA1308  
+        // Lower-case is easier to read and headers use plain ASCII anyway
         var expectedHeaderList = new List<string>(expectedHeaders);
         var gotHeaderList = new List<string>(
             from header in gotHeaders 
             from value in header.Value 
             select $"{header.Key.ToLowerInvariant()}: {value}");
+#pragma warning restore CA1308
 
         expectedHeaderList.Sort();
         gotHeaderList.Sort();

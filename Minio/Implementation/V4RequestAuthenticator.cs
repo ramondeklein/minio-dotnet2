@@ -8,12 +8,22 @@ using Minio.Helpers;
 
 namespace Minio.Implementation;
 
-internal class V4RequestAuthenticator : IRequestAuthenticator
+internal partial class V4RequestAuthenticator : IRequestAuthenticator
 {
     private readonly IMinioCredentialsProvider _minioCredentialsProvider;
     private readonly ITimeProvider _timeProvider;
     private readonly ILogger<V4RequestAuthenticator> _logger;
 
+    [GeneratedRegex(@"\s\s+")]
+    private static partial Regex RegexMultiSpace();
+
+    private static readonly Action<ILogger, string, Exception?> LogCanonicalRequest =
+        LoggerMessage.Define<string>(LogLevel.Trace, new EventId(id: 1, name: "CANONICAL_REQUEST"), "Canonical request:\n{CanonicalRequest}");
+    private static readonly Action<ILogger, string, Exception?> LogStringToSign =
+        LoggerMessage.Define<string>(LogLevel.Trace, new EventId(id: 2, name: "STRING_TO_SIGN"), "StringToSign:\n{StringToSign}");
+    private static readonly Action<ILogger, string, Exception?> LogSignature =
+        LoggerMessage.Define<string>(LogLevel.Trace, new EventId(id: 3, name: "SIGNATURE"), "Signature:\n{Signature}");
+    
     public V4RequestAuthenticator(IMinioCredentialsProvider minioCredentialsProvider, ITimeProvider timeProvider, ILogger<V4RequestAuthenticator> logger)
     {
         _minioCredentialsProvider = minioCredentialsProvider;
@@ -61,13 +71,13 @@ internal class V4RequestAuthenticator : IRequestAuthenticator
         signedHeaderItems.Add("host");
         foreach (var (name, values) in request.Headers)
         {
+#pragma warning disable CA1308  
+            // AWS S3 needs lower-case
             var headerName = name.ToLowerInvariant();
+#pragma warning restore CA1308
             if (headerName =="content-type" || headerName ==":authority" || headerName.StartsWith("x-amz-", StringComparison.Ordinal))
             {
-                var coercedValues = new List<string>();
-                foreach (var value in values)
-                    coercedValues.Add(Regex.Replace(value.Trim(), @"\s\s+", " "));
-                var coercedValue = string.Join(',', coercedValues);
+                var coercedValue = string.Join(',', values.Select(value => RegexMultiSpace().Replace(value.Trim(), " ")));
                 headerItems.Add($"{headerName}:{coercedValue}\n");
                 signedHeaderItems.Add(headerName);
             }
@@ -94,8 +104,7 @@ internal class V4RequestAuthenticator : IRequestAuthenticator
         canonicalRequestBuilder.Append('\n');
         canonicalRequestBuilder.Append(payloadHash);
         var canonicalRequest = canonicalRequestBuilder.ToString();
-        if (_logger.IsEnabled(LogLevel.Trace))
-            _logger.LogTrace("Canonical request:\n{CanonicalRequest}", canonicalRequest);
+        LogCanonicalRequest(_logger, canonicalRequest, null);
         
         var canonicalRequestHash = SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest)).ToHexStringLowercase();
 
@@ -105,8 +114,7 @@ internal class V4RequestAuthenticator : IRequestAuthenticator
         stringToSignBuilder.Append(CultureInfo.InvariantCulture, $"{signingDate[..8]}/{region}/{service}/aws4_request\n");
         stringToSignBuilder.Append(canonicalRequestHash);
         var stringToSign = stringToSignBuilder.ToString();
-        if (_logger.IsEnabled(LogLevel.Trace))
-            _logger.LogTrace("StringToSign:\n{StringToSign}", stringToSign);
+        LogStringToSign(_logger, stringToSign, null);
 
         var dateKey = HmacSha256($"AWS4{credentials.SecretKey}", signingDate[..8]);
         var dateRegionKey = HmacSha256(dateKey, region);
@@ -114,8 +122,7 @@ internal class V4RequestAuthenticator : IRequestAuthenticator
         var signingKey = HmacSha256(dateRegionServiceKey, "aws4_request");
 
         var signature = HmacSha256(signingKey, stringToSign).ToHexStringLowercase();
-        if (_logger.IsEnabled(LogLevel.Trace))
-            _logger.LogTrace("Signature: {Signature}", signature);
+        LogSignature(_logger, signature, null);
 
         return $"Credential={credentials.AccessKey}/{signingDate[..8]}/{region}/{service}/aws4_request, SignedHeaders={signedHeaders}, Signature={signature}";
     }
