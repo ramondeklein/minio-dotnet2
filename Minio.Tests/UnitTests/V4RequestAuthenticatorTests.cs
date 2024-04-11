@@ -9,9 +9,9 @@ namespace Minio.Tests.UnitTests;
 public class V4RequestAuthenticatorTests
 {
     [Fact]
-    public async Task Validate_Authentication()
+    public async Task ValidateAuthentication()
     {
-        var req = new HttpRequestMessage(HttpMethod.Get, "http://localhost:9000/test?delimiter=%2F&encoding-type=url&list-type=2&prefix=");
+        using var req = new HttpRequestMessage(HttpMethod.Get, "http://localhost:9000/test?delimiter=%2F&encoding-type=url&list-type=2&prefix=");
         req.Headers.Add("X-Amz-Content-Sha256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
         req.Headers.Add("X-Amz-Date", "20240411T153713Z");
 
@@ -19,7 +19,7 @@ public class V4RequestAuthenticatorTests
         var timeProvider = new StaticTimeProvider("20240411T153713Z");
         var logger = NullLoggerFactory.Instance.CreateLogger<V4RequestAuthenticator>();
         var authenticator = new V4RequestAuthenticator(credsProvider, timeProvider, logger);
-        await authenticator.AuthenticateAsync(req, "us-east-1", "s3", default);
+        await authenticator.AuthenticateAsync(req, "us-east-1", "s3", default).ConfigureAwait(true);
 
         Assert.NotNull(req.Headers.Authorization!.Scheme);
         Assert.Equal("AWS4-HMAC-SHA256", req.Headers.Authorization.Scheme);

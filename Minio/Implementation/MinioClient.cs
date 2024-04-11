@@ -35,7 +35,7 @@ internal class MinioClient : IMinioClient
     {
         try
         {
-            var req = CreateRequest(HttpMethod.Head, bucketName);
+            using var req = CreateRequest(HttpMethod.Head, bucketName);
             await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
             return true;
         }
@@ -54,7 +54,7 @@ internal class MinioClient : IMinioClient
                 new XElement(Ns + "Name", location)));
         }
 
-        var req = CreateRequest(HttpMethod.Put, bucketName, xml);
+        using var req = CreateRequest(HttpMethod.Put, bucketName, xml);
         if (objectLock)
             req.Headers.Add("X-Amz-Bucket-Object-Lock-Enabled", "true");
 
@@ -69,7 +69,7 @@ internal class MinioClient : IMinioClient
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(stream);
 
-        var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}");
+        using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}");
         req.Content = new StreamContent(stream)
         {
             Headers =
@@ -91,7 +91,7 @@ internal class MinioClient : IMinioClient
         var q = new QueryParams();
         if (!string.IsNullOrEmpty(versionId))
             q.Add("versionId", versionId);
-        var req = CreateRequest(HttpMethod.Get, $"{bucketName}/{key}", q);
+        using var req = CreateRequest(HttpMethod.Get, $"{bucketName}/{key}", q);
 
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
@@ -119,7 +119,7 @@ internal class MinioClient : IMinioClient
                 q.Add("start-after", startAfter);
             if (maxKeys > 0)
                 q.Add("max-keys", maxKeys.ToString(CultureInfo.InvariantCulture));
-            var req = CreateRequest(HttpMethod.Get, bucketName, q);
+            using var req = CreateRequest(HttpMethod.Get, bucketName, q);
 
             var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 

@@ -23,7 +23,7 @@ public abstract class MinioUnitTests
         var timeProvider = new StaticTimeProvider(CurrentTime);
         var authLogger = NullLoggerFactory.Instance.CreateLogger<V4RequestAuthenticator>();
         var authenticator = new V4RequestAuthenticator(credentialsProvider, timeProvider, authLogger);
-        var httpClientFactory = new TestHttpClientFactory(handler);
+        using var httpClientFactory = new TestHttpClientFactory(handler);
         var logger = NullLoggerFactory.Instance.CreateLogger<MinioClient>();
         return new MinioClient(options, timeProvider, authenticator, httpClientFactory, logger);
     }

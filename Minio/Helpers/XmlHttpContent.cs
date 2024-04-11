@@ -25,8 +25,11 @@ internal class XmlHttpContent : HttpContent
     
     protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
     {
-        await using var xmlWriter = XmlWriter.Create(stream, DefaultXmlWriterSettings);
-        await _xDocument.WriteToAsync(xmlWriter, default).ConfigureAwait(false);
+        var xmlWriter = XmlWriter.Create(stream, DefaultXmlWriterSettings);
+        await using (xmlWriter.ConfigureAwait(false))
+        {
+            await _xDocument.WriteToAsync(xmlWriter, default).ConfigureAwait(false);
+        }
     }
 
     protected override bool TryComputeLength(out long length)

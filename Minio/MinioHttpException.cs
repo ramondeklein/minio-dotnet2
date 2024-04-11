@@ -1,10 +1,13 @@
 namespace Minio;
 
+#pragma warning disable CA1032  // Don't need the default exception constructors
+
 public class MinioHttpException : Exception
 {
     public HttpRequestMessage Request { get; }
     public HttpResponseMessage Response { get; }
 
+    
     internal MinioHttpException(HttpRequestMessage request, HttpResponseMessage response)
         : base(GetMessage(request, response))
     {

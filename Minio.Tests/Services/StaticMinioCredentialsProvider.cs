@@ -2,15 +2,15 @@ namespace Minio.Tests.Services;
 
 public class StaticMinioCredentialsProvider : IMinioCredentialsProvider
 {
-    public Credentials Credentials { get; }
+    private readonly Credentials _credentials;
 
     public StaticMinioCredentialsProvider(string accessKey, string secretKey, string sessionToken = "")
     {
-        Credentials = new Credentials(accessKey, secretKey, sessionToken);
+        _credentials = new Credentials(accessKey, secretKey, sessionToken);
     }
     public ValueTask<Credentials> GetCredentials(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return new ValueTask<Credentials>(Credentials);
+        return new ValueTask<Credentials>(_credentials);
     }
 }

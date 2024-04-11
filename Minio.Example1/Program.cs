@@ -29,9 +29,9 @@ using var host = builder.Build();
 var minioClient = host.Services.GetRequiredService<IMinioClient>();
 
 // Create the test-bucket (if it doesn't exist)
-var hasBucket = await minioClient.HeadBucketAsync(testBucket);
+var hasBucket = await minioClient.HeadBucketAsync(testBucket).ConfigureAwait(false);
 if (!hasBucket)
-    await minioClient.MakeBucketAsync(testBucket);
+    await minioClient.MakeBucketAsync(testBucket).ConfigureAwait(false);
 
 // Write out 100 objects in parallel
 var buffer = new byte[256];
@@ -40,8 +40,11 @@ for (var i = 0; i < buffer.Length; ++i)
 
 await Task.WhenAll(Enumerable.Range(0, 100).Select(i => $"test-{i:D04}").Select(async key =>
 {
-    await using var ms = new MemoryStream(buffer, false);
-    await minioClient.PutObjectAsync(testBucket, key, ms).ConfigureAwait(false);
+    var ms = new MemoryStream(buffer, false);
+    await using (ms.ConfigureAwait(false))
+    {
+        await minioClient.PutObjectAsync(testBucket, key, ms).ConfigureAwait(false);
+    }
 })).ConfigureAwait(false);
 
 // Read an object file

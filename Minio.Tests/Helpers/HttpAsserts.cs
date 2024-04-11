@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Globalization;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using Xunit;
@@ -42,16 +43,16 @@ internal static class HttpAsserts
             var got = g < gotHeaderList.Count ? gotHeaderList[g] : string.Empty;
             var expected = e < expectedHeaderList.Count ? expectedHeaderList[e] : string.Empty;
 
-            if (expected == string.Empty || string.Compare(got, expected, StringComparison.Ordinal) < 0)
+            if (string.IsNullOrEmpty(expected) || string.Compare(got, expected, StringComparison.Ordinal) < 0)
             {
-                error.AppendLine($"+ {got}");
+                error.AppendLine(CultureInfo.InvariantCulture, $"+ {got}");
                 g++;
                 continue;
             }
 
-            if (got == string.Empty || string.Compare(got, expected, StringComparison.Ordinal) > 0)
+            if (string.IsNullOrEmpty(got) || string.Compare(got, expected, StringComparison.Ordinal) > 0)
             {
-                error.AppendLine($"- {expected}");
+                error.AppendLine(CultureInfo.InvariantCulture, $"- {expected}");
                 e++;
                 continue;
             }

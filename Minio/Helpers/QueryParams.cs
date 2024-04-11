@@ -45,7 +45,7 @@ internal class QueryParams
         return sb.ToString();
     }
 
-    private string AwsUriEncode(string text)
+    private static string AwsUriEncode(string text)
     {
         // AWS requires URL encoding where HEX values are in uppercase
         return System.Net.WebUtility.UrlEncode(text);

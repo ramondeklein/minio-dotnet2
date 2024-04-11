@@ -7,6 +7,7 @@ internal static class HttpHeadersExtensions
 {
     private static readonly Action<HttpHeaders, string, string> SetRawHeaderFunc;
 
+#pragma warning disable CA1065, CA1810  // Okay to have a static constructor for unit tests
     static HttpHeadersExtensions()
     {
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -36,6 +37,7 @@ internal static class HttpHeadersExtensions
 
         throw new InvalidOperationException("Cannot find required types");
     }
+#pragma warning restore CA1065, CA1810
     
     // .NET doesn't allow to set a raw header, but we need it for testing
     public static void SetRawHeader(this HttpHeaders headers, string name, string value)

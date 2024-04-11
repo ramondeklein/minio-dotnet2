@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -36,11 +37,11 @@ internal class V4RequestAuthenticator : IRequestAuthenticator
 
         // Use the X-Amz-Date header (if present) to avoid differences between timestamps
         var signingDate = request.Headers.TryGetValues("X-Amz-Date", out var dateValues) ? dateValues.First() : null;
-        signingDate ??= _timeProvider.UtcNow.ToString("yyyyMMddTHHmmssZ");
+        signingDate ??= _timeProvider.UtcNow.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture);
         
         // Determine canonical URI
         var canonicalUri = request.RequestUri.AbsolutePath; // TODO: Check if it starts with a '/'
-        if (canonicalUri == string.Empty) canonicalUri = "/";
+        if (string.IsNullOrEmpty(canonicalUri)) canonicalUri = "/";
         
         // Determine canonical query
         var canonicalQueryString = string.Empty;
@@ -100,8 +101,8 @@ internal class V4RequestAuthenticator : IRequestAuthenticator
 
         var stringToSignBuilder = new StringBuilder();
         stringToSignBuilder.Append("AWS4-HMAC-SHA256\n");
-        stringToSignBuilder.Append($"{signingDate}\n");
-        stringToSignBuilder.Append($"{signingDate[..8]}/{region}/{service}/aws4_request\n");
+        stringToSignBuilder.Append(CultureInfo.InvariantCulture, $"{signingDate}\n");
+        stringToSignBuilder.Append(CultureInfo.InvariantCulture, $"{signingDate[..8]}/{region}/{service}/aws4_request\n");
         stringToSignBuilder.Append(canonicalRequestHash);
         var stringToSign = stringToSignBuilder.ToString();
         if (_logger.IsEnabled(LogLevel.Trace))

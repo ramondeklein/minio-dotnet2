@@ -1,8 +1,8 @@
 namespace Minio.Tests.Services;
 
-public class TestHttpClientFactory : IHttpClientFactory
+public sealed class TestHttpClientFactory : IHttpClientFactory, IDisposable
 {
-    private class MockHttpMessageHandler : DelegatingHandler
+    private sealed class MockHttpMessageHandler : DelegatingHandler
     {
         private readonly Action<HttpRequestMessage, HttpResponseMessage> _handler;
 
@@ -29,4 +29,9 @@ public class TestHttpClientFactory : IHttpClientFactory
     }
     
     public HttpClient CreateClient(string name) => new(_messageHandler);
+
+    public void Dispose()
+    {
+        _messageHandler.Dispose();
+    }
 }

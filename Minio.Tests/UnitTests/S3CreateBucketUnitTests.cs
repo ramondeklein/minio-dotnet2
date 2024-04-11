@@ -27,7 +27,7 @@ public class S3CreateBucketUnitTests : MinioUnitTests
             resp.StatusCode = HttpStatusCode.OK;
         });
 
-        var location = await minioClient.MakeBucketAsync("testbucket", "us-east-2", true);
+        var location = await minioClient.MakeBucketAsync("testbucket", "us-east-2", true).ConfigureAwait(true);
         
         // Check result
         Assert.Equal("/testbucket", location);
