@@ -25,7 +25,7 @@ internal class V4RequestAuthenticator : IRequestAuthenticator
     {
         ArgumentNullException.ThrowIfNull(request);
         
-        var credentials = await _minioCredentialsProvider.GetCredentials(cancellationToken).ConfigureAwait(false);
+        var credentials = await _minioCredentialsProvider.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
         // TODO: Deal with session-token???
         var authorization = CalculateAuthorization(credentials, region, service, request);
         request.Headers.Authorization = new AuthenticationHeaderValue("AWS4-HMAC-SHA256", authorization);

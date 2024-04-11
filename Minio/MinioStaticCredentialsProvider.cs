@@ -11,7 +11,7 @@ public class MinioStaticCredentialsProvider : IMinioCredentialsProvider
         _options = options;
     }
     
-    public ValueTask<Credentials> GetCredentials(CancellationToken cancellationToken)
+    public ValueTask<Credentials> GetCredentialsAsync(CancellationToken cancellationToken)
     {
         var options = _options.Value;
         return new ValueTask<Credentials>(new Credentials(options.AccessKey, options.SecretKey));

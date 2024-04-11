@@ -1,6 +1,6 @@
 namespace Minio;
 
-public interface ITimeProvider
+internal interface ITimeProvider
 {
     public DateTime UtcNow { get; }
 }

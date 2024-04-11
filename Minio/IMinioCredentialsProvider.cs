@@ -4,5 +4,5 @@ public readonly record struct Credentials(string AccessKey, string SecretKey, st
 
 public interface IMinioCredentialsProvider
 {
-    ValueTask<Credentials> GetCredentials(CancellationToken cancellationToken);
+    ValueTask<Credentials> GetCredentialsAsync(CancellationToken cancellationToken);
 }

@@ -70,13 +70,7 @@ internal class MinioClient : IMinioClient
         ArgumentNullException.ThrowIfNull(stream);
 
         using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}");
-        req.Content = new StreamContent(stream)
-        {
-            Headers =
-            {
-                ContentLength = stream.Length
-            }
-        };
+        req.Content = new StreamContent(stream);
         if (!string.IsNullOrEmpty(contentType))
             req.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
 
@@ -89,8 +83,7 @@ internal class MinioClient : IMinioClient
         ArgumentException.ThrowIfNullOrEmpty(key);
 
         var q = new QueryParams();
-        if (!string.IsNullOrEmpty(versionId))
-            q.Add("versionId", versionId);
+        q.AddIfNotNullOrEmpty("versionId", versionId);
         using var req = CreateRequest(HttpMethod.Get, $"{bucketName}/{key}", q);
 
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
@@ -107,16 +100,11 @@ internal class MinioClient : IMinioClient
         {
             var q = new QueryParams();
             q.Add("list-type", "2");
-            if (!string.IsNullOrEmpty(continuationToken))
-                q.Add("continuation-token", continuationToken);
-            if (!string.IsNullOrEmpty(prefix))
-                q.Add("prefix", prefix);
-            if (!string.IsNullOrEmpty(delimiter))
-                q.Add("delimiter", delimiter);
-            if (!string.IsNullOrEmpty(encodingType))
-                q.Add("encoding-type", encodingType);
-            if (!string.IsNullOrEmpty(startAfter))
-                q.Add("start-after", startAfter);
+            q.AddIfNotNullOrEmpty("continuation-token", continuationToken);
+            q.AddIfNotNullOrEmpty("prefix", prefix);
+            q.AddIfNotNullOrEmpty("delimiter", delimiter);
+            q.AddIfNotNullOrEmpty("encoding-type", encodingType);
+            q.AddIfNotNullOrEmpty("start-after", startAfter);
             if (maxKeys > 0)
                 q.Add("max-keys", maxKeys.ToString(CultureInfo.InvariantCulture));
             using var req = CreateRequest(HttpMethod.Get, bucketName, q);

@@ -8,7 +8,7 @@ public class StaticMinioCredentialsProvider : IMinioCredentialsProvider
     {
         _credentials = new Credentials(accessKey, secretKey, sessionToken);
     }
-    public ValueTask<Credentials> GetCredentials(CancellationToken cancellationToken)
+    public ValueTask<Credentials> GetCredentialsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return new ValueTask<Credentials>(_credentials);

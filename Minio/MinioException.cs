@@ -1,16 +1,16 @@
 namespace Minio;
 
-public class MinioException : Exception
+public abstract class MinioException : Exception
 {
-    protected MinioException()
+    internal MinioException()
     {
     }
     
-    protected MinioException(string message) : base(message)
+    internal MinioException(string message) : base(message)
     {
     }
     
-    protected MinioException(string message, Exception innerException) : base(message, innerException)
+    internal MinioException(string message, Exception innerException) : base(message, innerException)
     {
     }
 }

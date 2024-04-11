@@ -18,6 +18,20 @@ internal class QueryParams
         return this;
     }
 
+    public QueryParams AddIfNotNull(string name, string? value)
+    {
+        if (value != null)
+            Add(name, value);
+        return this;
+    }
+
+    public QueryParams AddIfNotNullOrEmpty(string name, string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
+            Add(name, value);
+        return this;
+    }
+
     public IReadOnlyList<string> Get(string name)
     {
         if (_params != null && _params.TryGetValue(name, out var values))

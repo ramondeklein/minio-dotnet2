@@ -3,7 +3,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AnalysisMode>AllEnabledByDefault</AnalysisMode>
-    <NoWarn>$(NoWarn);1591;CA1308;CA1848</NoWarn>
+    <NoWarn>$(NoWarn);CA1308;CA1848</NoWarn>
     <Configurations>Debug;Release</Configurations>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
