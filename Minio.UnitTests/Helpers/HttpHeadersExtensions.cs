@@ -1,7 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Reflection;
 
-namespace Minio.Tests.Helpers;
+namespace Minio.UnitTests.Helpers;
 
 internal static class HttpHeadersExtensions
 {

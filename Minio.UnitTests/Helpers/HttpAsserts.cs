@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Xunit;
 
-namespace Minio.Tests.Helpers;
+namespace Minio.UnitTests.Helpers;
 
 internal static class HttpAsserts
 {

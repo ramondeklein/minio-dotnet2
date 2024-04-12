@@ -9,7 +9,7 @@
     <ItemGroup>
         <!-- Allow Minio.Tests to access the internal classes -->
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-            <_Parameter1>$(AssemblyName).Tests</_Parameter1>
+            <_Parameter1>$(AssemblyName).UnitTests</_Parameter1>
         </AssemblyAttribute>
     </ItemGroup>
 </Project>

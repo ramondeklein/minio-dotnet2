@@ -2,9 +2,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Minio.Implementation;
-using Minio.Tests.Services;
+using Minio.UnitTests.Services;
 
-namespace Minio.Tests.UnitTests;
+namespace Minio.UnitTests.UnitTests;
 
 public abstract class MinioUnitTests
 {

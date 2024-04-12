@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Minio.Tests.Services;
+namespace Minio.UnitTests.Services;
 
 public class StaticTimeProvider : ITimeProvider
 {

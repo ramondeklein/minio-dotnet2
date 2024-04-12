@@ -1,8 +1,8 @@
-using Minio.Tests.Helpers;
-using Minio.Tests.Services;
+using Minio.UnitTests.Helpers;
+using Minio.UnitTests.Services;
 using Xunit;
 
-namespace Minio.Tests.UnitTests;
+namespace Minio.UnitTests.UnitTests;
 
 public class HttpAssertsTests
 {

@@ -4,7 +4,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Minio.Example1", "Minio.Exa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Minio", "Minio\Minio.csproj", "{CE3B14B0-342A-476D-9A29-8F58697A2C1A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Minio.Tests", "Minio.Tests\Minio.Tests.csproj", "{6F9B405F-D223-46EB-9087-067E2ED12AED}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Minio.UnitTests", "Minio.UnitTests\Minio.UnitTests.csproj", "{6F9B405F-D223-46EB-9087-067E2ED12AED}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution files", "Solution files", "{72C1F715-BD16-4F7F-9E52-111B815E7348}"
 	ProjectSection(SolutionItems) = preProject

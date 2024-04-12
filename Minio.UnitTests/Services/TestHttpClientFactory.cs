@@ -1,4 +1,4 @@
-namespace Minio.Tests.Services;
+namespace Minio.UnitTests.Services;
 
 public sealed class TestHttpClientFactory : IHttpClientFactory, IDisposable
 {

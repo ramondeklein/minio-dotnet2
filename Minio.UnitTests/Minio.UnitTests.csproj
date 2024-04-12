@@ -3,6 +3,7 @@
     <PropertyGroup>
         <!-- No need to document all unit-tests -->
         <NoWarn>$(NoWarn);1591</NoWarn>
+        <RootNamespace>Minio.Tests</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

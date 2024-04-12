@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Minio.Implementation;
-using Minio.Tests.Services;
+using Minio.UnitTests.Services;
 using Xunit;
 
-namespace Minio.Tests.UnitTests;
+namespace Minio.UnitTests.UnitTests;
 
 public class V4RequestAuthenticatorTests
 {

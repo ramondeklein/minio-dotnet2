@@ -16,7 +16,7 @@ builder.Logging
 builder.Services
     .AddMinio(opts =>
     {
-        // Run: docker run --rm -p 9000:9000 minio/minio server /data to start a local Minio instance
+        // Run: docker run --rm -p 9000:9000 minio/minio server /data
         opts.EndPoint = new Uri("http://localhost:9000");
         opts.AccessKey = "minioadmin";
         opts.SecretKey = "minioadmin";

@@ -1,8 +1,8 @@
 ﻿using System.Net;
-using Minio.Tests.Helpers;
+using Minio.UnitTests.Helpers;
 using Xunit;
 
-namespace Minio.Tests.UnitTests;
+namespace Minio.UnitTests.UnitTests;
 
 public class S3HeadBucketUnitTests : MinioUnitTests
 {
