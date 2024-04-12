@@ -12,30 +12,58 @@ namespace Minio;
 
 public sealed class MinioClientBuilder
 {
-    public required Uri EndPoint { get; init; }
-    public string Region { get; set; } = "us-east-1";
-    public string AccessKey { get; set; } = "minioadmin";  
-    public string SecretKey { get; set; } = "minioadmin";
+    public Uri EndPoint { get; }
+    public string Region { get; private set; } = "us-east-1";
+    public ICredentialsProvider? CredentialsProvider { get; private set; }
+
+    public MinioClientBuilder(string endPoint) : this(new Uri(endPoint))
+    {
+    }
+
+    public MinioClientBuilder(Uri endPoint)
+    {
+        EndPoint = endPoint;
+    }
 
     public IMinioClient Build()
     {
+        if (CredentialsProvider == null)
+            throw new InvalidOperationException("No credentials specified");
+
         var clientOptions = Options.Create(new ClientOptions
         {
             EndPoint = EndPoint,
             Region = Region,
         });
-        var credentialOptions = Options.Create(new StaticCredentialsOptions
-        {
-            AccessKey = AccessKey,
-            SecretKey = SecretKey,
-        });
         var timeProvider = new DefaultTimeProvider();
-        var credentialsProvider = new MinioStaticCredentialsProvider(credentialOptions);
         var authLogger = NullLoggerFactory.Instance.CreateLogger<V4RequestAuthenticator>();
-        var authenticator = new V4RequestAuthenticator(credentialsProvider, timeProvider, authLogger);
+        var authenticator = new V4RequestAuthenticator(CredentialsProvider, timeProvider, authLogger);
         var httpClientFactory = new HttpClientFactory();
         var minioLogger = NullLoggerFactory.Instance.CreateLogger<MinioClient>();
         return new MinioClient(clientOptions, timeProvider, authenticator, httpClientFactory, minioLogger);
+    }
+
+    public MinioClientBuilder WithRegion(string region)
+    {
+        Region = region;
+        return this;
+    }
+
+    public MinioClientBuilder WithCredentialsProvider(ICredentialsProvider credentialsProvider)
+    {
+        CredentialsProvider = credentialsProvider;
+        return this;
+    }
+    
+    public MinioClientBuilder WithStaticCredentials(string accessKey, string secretKey, string? sessionToken = null)
+    {
+        var credentialOptions = Options.Create(new StaticCredentialsOptions
+        {
+            AccessKey = accessKey,
+            SecretKey = secretKey,
+            SessionToken = sessionToken,
+        });
+        return WithCredentialsProvider(new StaticCredentialsProvider(credentialOptions));
     }
     
     internal static AsyncRetryPolicy<HttpResponseMessage> GetRetryPolicy()

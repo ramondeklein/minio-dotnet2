@@ -1,4 +1,3 @@
-using DotNet.Testcontainers.Builders;
 using Testcontainers.Minio;
 using Xunit;
 
@@ -6,34 +5,17 @@ namespace Minio.IntegrationTests.Tests;
 
 public abstract class MinioTest : IAsyncLifetime
 {
-    private readonly MinioContainer _minioContainer;
+    private readonly MinioContainer _minioContainer = new MinioBuilder()
+        .WithImage("quay.io/minio/minio:latest")
+        .Build();
 
-    protected MinioTest()
-    {
-        _minioContainer = new MinioBuilder()
-            .WithImage("quay.io/minio/minio:latest")
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(9000))
-            .Build();
-    }
-        
+    public Task InitializeAsync() => _minioContainer.StartAsync();
+    public Task DisposeAsync() => _minioContainer.StopAsync();
+
     protected IMinioClient CreateClient()
     {
-        return new MinioClientBuilder
-            {
-                EndPoint = new Uri(_minioContainer.GetConnectionString()),
-                AccessKey = _minioContainer.GetAccessKey(),
-                SecretKey = _minioContainer.GetSecretKey(),
-            }
+        return new MinioClientBuilder(_minioContainer.GetConnectionString())
+            .WithStaticCredentials(_minioContainer.GetAccessKey(), _minioContainer.GetSecretKey())
             .Build();        
-    }
-    
-    public async Task InitializeAsync()
-    {
-        await _minioContainer.StartAsync().ConfigureAwait(true);
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _minioContainer.StopAsync().ConfigureAwait(true);
     }
 }

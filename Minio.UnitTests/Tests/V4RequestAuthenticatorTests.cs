@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Minio.Implementation;
 using Minio.UnitTests.Services;
 using Xunit;
@@ -15,7 +16,11 @@ public class V4RequestAuthenticatorTests
         req.Headers.Add("X-Amz-Content-Sha256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
         req.Headers.Add("X-Amz-Date", "20240411T153713Z");
 
-        var credsProvider = new StaticMinioCredentialsProvider("minioadmin", "minioadmin");
+        var credsProvider = new StaticCredentialsProvider(Options.Create(new StaticCredentialsOptions
+        {
+            AccessKey = "minioadmin", 
+            SecretKey = "minioadmin",
+        }));
         var timeProvider = new StaticTimeProvider("20240411T153713Z");
         var logger = NullLoggerFactory.Instance.CreateLogger<V4RequestAuthenticator>();
         var authenticator = new V4RequestAuthenticator(credsProvider, timeProvider, logger);

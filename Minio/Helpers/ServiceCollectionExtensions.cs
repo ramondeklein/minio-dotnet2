@@ -8,7 +8,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 public interface IMinioBuilder
 {
     IMinioBuilder WithStaticCredentials(Action<StaticCredentialsOptions> configure);
-    IMinioBuilder WithStaticCredentials(string accessKey, string secretKey);
+    IMinioBuilder WithStaticCredentials(string accessKey, string secretKey, string? sessionToken = null);
 }
 
 public static class ServiceCollectionServiceExtensions
@@ -22,32 +22,35 @@ public static class ServiceCollectionServiceExtensions
             _serviceCollection = serviceCollection;
         }
 
-        public IMinioBuilder WithStaticCredentials(Action<StaticCredentialsOptions> configure)
+        public IMinioBuilder WithStaticCredentials(Action<StaticCredentialsOptions>? configure = null)
         {
-            _serviceCollection.Configure(configure);
-            _serviceCollection.AddSingleton<IMinioCredentialsProvider, MinioStaticCredentialsProvider>();
+            if (configure != null)
+                _serviceCollection.Configure(configure);
+            _serviceCollection.AddSingleton<ICredentialsProvider, StaticCredentialsProvider>();
             return this;
         }
         
-        public IMinioBuilder WithStaticCredentials(string accessKey, string secretKey)
+        public IMinioBuilder WithStaticCredentials(string accessKey, string secretKey, string? sessionToken = null)
             => WithStaticCredentials(opts =>
             {
                 opts.AccessKey = accessKey;
                 opts.SecretKey = secretKey;
+                opts.SessionToken = sessionToken;
             });
     }
     
     public static IMinioBuilder AddMinio(
         this IServiceCollection services,
-        Action<ClientOptions> configure,
+        Action<ClientOptions>? configure = null,
         ServiceLifetime lifetime = ServiceLifetime.Singleton)
     {
         services.AddHttpClient("MinioClient").AddPolicyHandler(MinioClientBuilder.GetRetryPolicy());
         services.TryAddSingleton<ITimeProvider, DefaultTimeProvider>();
-        services.TryAddSingleton<IMinioCredentialsProvider, MinioStaticCredentialsProvider>();
+        services.TryAddSingleton<ICredentialsProvider, StaticCredentialsProvider>();
         services.TryAdd(new ServiceDescriptor(typeof(IRequestAuthenticator), typeof(V4RequestAuthenticator), lifetime));
         services.TryAdd(new ServiceDescriptor(typeof(IMinioClient), typeof(MinioClient), lifetime));
-        services.Configure(configure);
+        if (configure != null)
+            services.Configure(configure);
         return new MinioBuilder(services);
     }
 

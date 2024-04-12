@@ -2,11 +2,11 @@ using Microsoft.Extensions.Options;
 
 namespace Minio;
 
-public class MinioStaticCredentialsProvider : IMinioCredentialsProvider
+public class StaticCredentialsProvider : ICredentialsProvider
 {
     private readonly IOptions<StaticCredentialsOptions> _options;
 
-    public MinioStaticCredentialsProvider(IOptions<StaticCredentialsOptions> options)
+    public StaticCredentialsProvider(IOptions<StaticCredentialsOptions> options)
     {
         _options = options;
     }

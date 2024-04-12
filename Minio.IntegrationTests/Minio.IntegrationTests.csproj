@@ -1,10 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <!-- No need to document all tests -->
-        <NoWarn>$(NoWarn);1591</NoWarn>
-    </PropertyGroup>
-
     <ItemGroup>
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
       <PackageReference Include="Testcontainers.Minio" Version="3.8.0" />

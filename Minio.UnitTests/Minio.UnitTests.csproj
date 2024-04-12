@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <!-- No need to document all tests -->
-        <NoWarn>$(NoWarn);1591</NoWarn>
+        <!-- Some unit tests depend on .NET Core internals and don't work with .NET 6 -->
+        <TargetFrameworks>net7.0;net8.0</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>

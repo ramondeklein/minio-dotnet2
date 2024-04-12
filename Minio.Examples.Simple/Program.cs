@@ -1,11 +1,12 @@
 ﻿using Minio;
 
-var minioClient = new MinioClientBuilder
-{
-    EndPoint = new Uri("http://localhost:9000"),
-    AccessKey = "minioadmin",
-    SecretKey = "minioadmin",
-}.Build();
+// Ensure that Minio is running:
+//   docker run --rm -p 9000:9000 quay.io/minio/minio:latest server /data
+
+// Create Minio client
+var minioClient = new MinioClientBuilder("http://localhost:9000")
+    .WithStaticCredentials("minioadmin", "minioadmin")
+    .Build();
 
 // Create the test-bucket (if it doesn't exist)
 const string testBucket = "testbucket";

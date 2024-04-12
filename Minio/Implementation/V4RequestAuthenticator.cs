@@ -14,7 +14,7 @@ namespace Minio.Implementation;
 
 internal partial class V4RequestAuthenticator : IRequestAuthenticator
 {
-    private readonly IMinioCredentialsProvider _minioCredentialsProvider;
+    private readonly ICredentialsProvider _credentialsProvider;
     private readonly ITimeProvider _timeProvider;
     private readonly ILogger<V4RequestAuthenticator> _logger;
 
@@ -33,9 +33,9 @@ internal partial class V4RequestAuthenticator : IRequestAuthenticator
     private static readonly Action<ILogger, string, Exception?> LogSignature =
         LoggerMessage.Define<string>(LogLevel.Trace, new EventId(id: 3, name: "SIGNATURE"), "Signature:\n{Signature}");
     
-    public V4RequestAuthenticator(IMinioCredentialsProvider minioCredentialsProvider, ITimeProvider timeProvider, ILogger<V4RequestAuthenticator> logger)
+    public V4RequestAuthenticator(ICredentialsProvider credentialsProvider, ITimeProvider timeProvider, ILogger<V4RequestAuthenticator> logger)
     {
-        _minioCredentialsProvider = minioCredentialsProvider;
+        _credentialsProvider = credentialsProvider;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -44,7 +44,7 @@ internal partial class V4RequestAuthenticator : IRequestAuthenticator
     {
         ArgumentNullException.ThrowIfNull(request);
         
-        var credentials = await _minioCredentialsProvider.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
+        var credentials = await _credentialsProvider.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
         // TODO: Deal with session-token???
         var authorization = CalculateAuthorization(credentials, region, service, request);
         request.Headers.Authorization = new AuthenticationHeaderValue("AWS4-HMAC-SHA256", authorization);

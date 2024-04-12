@@ -3,6 +3,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Minio;
 
+// Ensure that Minio is running:
+//   docker run --rm -p 9000:9000 quay.io/minio/minio:latest server /data
+
 var builder = Host.CreateApplicationBuilder(args);
 
 // Configure logging
@@ -11,7 +14,8 @@ builder.Logging
     .SetMinimumLevel(LogLevel.Warning);
 
 // Add Minio
-builder.Services.AddMinio("http://localhost:9000")
+builder.Services
+    .AddMinio("http://localhost:9000")
     .WithStaticCredentials("minioadmin", "minioadmin");
 
 // Obtain a host
