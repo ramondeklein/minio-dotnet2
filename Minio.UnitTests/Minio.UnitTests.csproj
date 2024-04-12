@@ -1,9 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <!-- No need to document all unit-tests -->
+        <!-- No need to document all tests -->
         <NoWarn>$(NoWarn);1591</NoWarn>
-        <RootNamespace>Minio.Tests</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

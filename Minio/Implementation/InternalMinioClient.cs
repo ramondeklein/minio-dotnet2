@@ -16,13 +16,13 @@ internal class MinioClient : IMinioClient
     private static readonly XNamespace Ns = "http://s3.amazonaws.com/doc/2006-03-01/";
     private const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"; 
 
-    private readonly IOptions<MinioClientOptions> _options;
+    private readonly IOptions<ClientOptions> _options;
     private readonly ITimeProvider _timeProvider;
     private readonly IRequestAuthenticator _requestAuthenticator;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<MinioClient> _logger;
 
-    public MinioClient(IOptions<MinioClientOptions> options, ITimeProvider timeProvider, IRequestAuthenticator requestAuthenticator, IHttpClientFactory httpClientFactory, ILogger<MinioClient> logger)
+    public MinioClient(IOptions<ClientOptions> options, ITimeProvider timeProvider, IRequestAuthenticator requestAuthenticator, IHttpClientFactory httpClientFactory, ILogger<MinioClient> logger)
     {
         _options = options;
         _timeProvider = timeProvider;

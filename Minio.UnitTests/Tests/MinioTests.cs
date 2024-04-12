@@ -15,7 +15,7 @@ public abstract class MinioUnitTests
     
     protected IMinioClient GetMinioClient(Action<HttpRequestMessage, HttpResponseMessage> handler)
     {
-        var options = Options.Create(new MinioClientOptions
+        var options = Options.Create(new ClientOptions
         {
             EndPoint = new Uri(MinioEndPoint)
         });

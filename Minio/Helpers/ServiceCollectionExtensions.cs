@@ -5,19 +5,55 @@ using Minio.Implementation;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
 
+public interface IMinioBuilder
+{
+    IMinioBuilder WithStaticCredentials(Action<StaticCredentialsOptions> configure);
+    IMinioBuilder WithStaticCredentials(string accessKey, string secretKey);
+}
+
 public static class ServiceCollectionServiceExtensions
 {
-    public static IServiceCollection AddMinio(
+    private sealed class MinioBuilder : IMinioBuilder
+    {
+        private readonly IServiceCollection _serviceCollection;
+
+        public MinioBuilder(IServiceCollection serviceCollection)
+        {
+            _serviceCollection = serviceCollection;
+        }
+
+        public IMinioBuilder WithStaticCredentials(Action<StaticCredentialsOptions> configure)
+        {
+            _serviceCollection.Configure(configure);
+            _serviceCollection.AddSingleton<IMinioCredentialsProvider, MinioStaticCredentialsProvider>();
+            return this;
+        }
+        
+        public IMinioBuilder WithStaticCredentials(string accessKey, string secretKey)
+            => WithStaticCredentials(opts =>
+            {
+                opts.AccessKey = accessKey;
+                opts.SecretKey = secretKey;
+            });
+    }
+    
+    public static IMinioBuilder AddMinio(
         this IServiceCollection services,
-        Action<MinioClientOptions> configure,
+        Action<ClientOptions> configure,
         ServiceLifetime lifetime = ServiceLifetime.Singleton)
     {
-        services.AddHttpClient();
+        services.AddHttpClient("MinioClient").AddPolicyHandler(MinioClientBuilder.GetRetryPolicy());
         services.TryAddSingleton<ITimeProvider, DefaultTimeProvider>();
         services.TryAddSingleton<IMinioCredentialsProvider, MinioStaticCredentialsProvider>();
         services.TryAdd(new ServiceDescriptor(typeof(IRequestAuthenticator), typeof(V4RequestAuthenticator), lifetime));
         services.TryAdd(new ServiceDescriptor(typeof(IMinioClient), typeof(MinioClient), lifetime));
         services.Configure(configure);
-        return services;
+        return new MinioBuilder(services);
     }
+
+    public static IMinioBuilder AddMinio(this IServiceCollection services, Uri endPoint)
+        => services.AddMinio(opts => opts.EndPoint = endPoint);
+
+    public static IMinioBuilder AddMinio(this IServiceCollection services, string endPoint)
+        => services.AddMinio(opts => opts.EndPoint = new Uri(endPoint));
 }

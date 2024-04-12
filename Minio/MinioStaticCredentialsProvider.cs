@@ -4,9 +4,9 @@ namespace Minio;
 
 public class MinioStaticCredentialsProvider : IMinioCredentialsProvider
 {
-    private readonly IOptions<MinioClientOptions> _options;
+    private readonly IOptions<StaticCredentialsOptions> _options;
 
-    public MinioStaticCredentialsProvider(IOptions<MinioClientOptions> options)
+    public MinioStaticCredentialsProvider(IOptions<StaticCredentialsOptions> options)
     {
         _options = options;
     }

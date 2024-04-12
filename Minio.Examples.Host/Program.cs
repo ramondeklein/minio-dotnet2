@@ -3,24 +3,16 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Minio;
 
-const string testBucket = "testbucket";
-
 var builder = Host.CreateApplicationBuilder(args);
 
 // Configure logging
 builder.Logging
-    .AddSimpleConsole(opt => opt.SingleLine = true)
+    .AddSimpleConsole(opt => opt.SingleLine = true) 
     .SetMinimumLevel(LogLevel.Warning);
 
 // Add Minio
-builder.Services
-    .AddMinio(opts =>
-    {
-        // Run: docker run --rm -p 9000:9000 minio/minio server /data
-        opts.EndPoint = new Uri("http://localhost:9000");
-        opts.AccessKey = "minioadmin";
-        opts.SecretKey = "minioadmin";
-    });
+builder.Services.AddMinio("http://localhost:9000")
+    .WithStaticCredentials("minioadmin", "minioadmin");
 
 // Obtain a host
 using var host = builder.Build();
@@ -29,6 +21,7 @@ using var host = builder.Build();
 var minioClient = host.Services.GetRequiredService<IMinioClient>();
 
 // Create the test-bucket (if it doesn't exist)
+const string testBucket = "testbucket";
 var hasBucket = await minioClient.HeadBucketAsync(testBucket).ConfigureAwait(false);
 if (!hasBucket)
     await minioClient.MakeBucketAsync(testBucket).ConfigureAwait(false);
