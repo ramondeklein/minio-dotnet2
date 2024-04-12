@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Minio.Implementation;
 using Minio.UnitTests.Services;
 
-namespace Minio.UnitTests.UnitTests;
+namespace Minio.UnitTests.Tests;
 
 public abstract class MinioUnitTests
 {

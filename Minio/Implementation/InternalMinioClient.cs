@@ -9,6 +9,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Minio.Helpers;
 
+#if NET6_0
+using ArgumentException = Shims.ArgumentException; 
+using ArgumentNullException = Shims.ArgumentNullException; 
+using SHA256 = Shims.SHA256; 
+#endif
+
 namespace Minio.Implementation;
 
 internal class MinioClient : IMinioClient

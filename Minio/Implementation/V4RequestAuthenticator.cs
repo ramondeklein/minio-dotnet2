@@ -6,6 +6,10 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Minio.Helpers;
 
+#if NET6_0
+using SHA256 = Shims.SHA256;
+#endif
+
 namespace Minio.Implementation;
 
 internal partial class V4RequestAuthenticator : IRequestAuthenticator
@@ -14,8 +18,13 @@ internal partial class V4RequestAuthenticator : IRequestAuthenticator
     private readonly ITimeProvider _timeProvider;
     private readonly ILogger<V4RequestAuthenticator> _logger;
 
+#if !NET6_0
     [GeneratedRegex(@"\s\s+")]
     private static partial Regex RegexMultiSpace();
+#else
+    private static readonly Regex _regexMultiSpace = new(@"\s\s+");
+    private static Func<Regex> RegexMultiSpace = () => _regexMultiSpace; 
+#endif
 
     private static readonly Action<ILogger, string, Exception?> LogCanonicalRequest =
         LoggerMessage.Define<string>(LogLevel.Trace, new EventId(id: 1, name: "CANONICAL_REQUEST"), "Canonical request:\n{CanonicalRequest}");

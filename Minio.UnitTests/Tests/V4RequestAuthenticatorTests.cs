@@ -4,7 +4,7 @@ using Minio.Implementation;
 using Minio.UnitTests.Services;
 using Xunit;
 
-namespace Minio.UnitTests.UnitTests;
+namespace Minio.UnitTests.Tests;
 
 public class V4RequestAuthenticatorTests
 {

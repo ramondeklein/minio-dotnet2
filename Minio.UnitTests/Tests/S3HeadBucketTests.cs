@@ -2,7 +2,7 @@
 using Minio.UnitTests.Helpers;
 using Xunit;
 
-namespace Minio.UnitTests.UnitTests;
+namespace Minio.UnitTests.Tests;
 
 public class S3HeadBucketUnitTests : MinioUnitTests
 {
