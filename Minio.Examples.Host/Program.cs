@@ -28,7 +28,7 @@ var minioClient = host.Services.GetRequiredService<IMinioClient>();
 const string testBucket = "testbucket";
 var hasBucket = await minioClient.HeadBucketAsync(testBucket).ConfigureAwait(false);
 if (!hasBucket)
-    await minioClient.MakeBucketAsync(testBucket).ConfigureAwait(false);
+    await minioClient.CreateBucketAsync(testBucket).ConfigureAwait(false);
 
 // Write out 100 objects in parallel
 var buffer = new byte[256];
@@ -45,7 +45,7 @@ await Task.WhenAll(Enumerable.Range(0, 100).Select(i => $"test-{i:D04}").Select(
 })).ConfigureAwait(false);
 
 // Read an object file
-var stream = await minioClient.GetObjectAsync(testBucket, "test-0000").ConfigureAwait(false);
+var (stream, objectInfo) = await minioClient.GetObjectAsync(testBucket, "test-0000").ConfigureAwait(false);
 await using (stream.ConfigureAwait(false))
 {
     // TODO: Do something with the stream

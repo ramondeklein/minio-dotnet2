@@ -12,4 +12,4 @@ var minioClient = new MinioClientBuilder("http://localhost:9000")
 const string testBucket = "testbucket";
 var hasBucket = await minioClient.HeadBucketAsync(testBucket).ConfigureAwait(false);
 if (!hasBucket)
-    await minioClient.MakeBucketAsync(testBucket).ConfigureAwait(false);
+    await minioClient.CreateBucketAsync(testBucket).ConfigureAwait(false);

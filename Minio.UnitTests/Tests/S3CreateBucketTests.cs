@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using Minio.Model;
 using Minio.UnitTests.Helpers;
 using Xunit;
 
@@ -27,7 +28,8 @@ public class S3CreateBucketUnitTests : MinioUnitTests
             resp.StatusCode = HttpStatusCode.OK;
         });
 
-        var location = await minioClient.MakeBucketAsync("testbucket", "us-east-2", true).ConfigureAwait(true);
+        var opts = new CreateBucketOptions { Region = "us-east-2 " };
+        var location = await minioClient.CreateBucketAsync("testbucket", opts).ConfigureAwait(true);
         
         // Check result
         Assert.Equal("/testbucket", location);
