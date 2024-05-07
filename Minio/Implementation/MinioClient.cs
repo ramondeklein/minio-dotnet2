@@ -623,14 +623,28 @@ internal class MinioClient : IMinioClient
         var resp = await httpClient.SendAsync(req, cancellationToken).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
-            var stream = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            await using (stream.ConfigureAwait(false))
+            var xmlData = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(xmlData))
             {
-                var serializer = new XmlSerializer(typeof(ErrorResponse));
-                using var xmlReader = XmlReader.Create(stream);
-                var err = (ErrorResponse?)serializer.Deserialize(xmlReader);
-                throw new MinioHttpException(req, resp, err);
+                var xRoot = XDocument.Parse(xmlData).Root;
+                if (xRoot != null)
+                {
+                    var err = new ErrorResponse
+                    {
+                        Code = xRoot.Element("Code")?.Value ?? string.Empty,
+                        Message = xRoot.Element("Message")?.Value ?? string.Empty,
+                        BucketName = xRoot.Element("BucketName")?.Value ?? string.Empty,
+                        Key = xRoot.Element("Key")?.Value ?? string.Empty,
+                        Resource = xRoot.Element("Resource")?.Value ?? string.Empty,
+                        RequestId = xRoot.Element("RequestId")?.Value ?? string.Empty,
+                        HostId = xRoot.Element("HostId")?.Value ?? string.Empty,
+                        Region = xRoot.Element("Region")?.Value ?? string.Empty,
+                        Server = xRoot.Element("Server")?.Value ?? string.Empty,
+                    };
+                    throw new MinioHttpException(req, resp, err);
+                }
             }
+            throw new MinioHttpException(req, resp, null);
         }
 
         return resp;

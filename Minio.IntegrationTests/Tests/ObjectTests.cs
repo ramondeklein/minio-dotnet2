@@ -143,7 +143,7 @@ public class ObjectTests : MinioTest
 #if NET8_0_OR_GREATER
         await Parallel.ForAsync(0, totalParts, parallelOpts, async (part, ct) =>
 #else
-        await Parallel.ForEachAsync(Enumerable.Range(1, totalParts), async (part, ct) =>
+        await Parallel.ForEachAsync(Enumerable.Range(0, totalParts), parallelOpts, async (part, ct) =>
 #endif
         {
             var data = GetRandomData(partSize);
