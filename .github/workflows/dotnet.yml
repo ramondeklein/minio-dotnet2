@@ -1,0 +1,71 @@
+name: dotnet package
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet-version: [ '6.0.x','7.0.x','8.0.x' ]
+    env:
+      BUILD_CONFIG: 'Release'
+      VERSION: '0.0.0'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set Version Variable
+        if: ${{ github.ref_type == 'tag' }}
+        env:
+          TAG: ${{ github.ref_name }}
+        run: echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+      - name: Setup dotnet ${{ matrix.dotnet-version }}
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ matrix.dotnet-version }}
+
+      - name: Display dotnet version
+        run: dotnet --version
+        
+      - uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          # Look to see if there is a cache hit for the corresponding requirements file
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget
+            
+      - name: Install dependencies
+        run: dotnet restore
+        
+      - name: Build
+        run: dotnet build --configuration $BUILD_CONFIG --no-restore /p:Version=$VERSION
+
+      - name: Run unit tests
+        run: dotnet test Minio.UnitTests --configuration $BUILD_CONFIG --no-build --logger trx --results-directory "UnitTestResults-${{ matrix.dotnet-version }}"
+
+      - name: Upload unit test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-tests-${{ matrix.dotnet-version }}
+          path: UnitTestResults-${{ matrix.dotnet-version }}
+        # Use always() to always run this step to publish test results when there are test failures
+        if: ${{ always() }}
+        
+      - name: Run integration tests
+        run: dotnet test Minio.IntegrationTests --configuration $BUILD_CONFIG --no-build --logger trx --results-directory "IntegrationTestResults-${{ matrix.dotnet-version }}"
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-tests-${{ matrix.dotnet-version }}
+          path: IntegrationTestResults-${{ matrix.dotnet-version }}
+        # Use always() to always run this step to publish test results when there are test failures
+        if: ${{ always() }}
+
+      - name: Create NuGet package
+        run: dotnet pack --configuration $BUILD_CONFIG --no-restore --no-build /p:PackageVersion=$VERSION
+
+      - name: Publish NuGet package
+        if: github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v')
+        run: nuget push **/*.nupkg -Source https://api.nuget.org/v3/index.json -ApiKey ${{secrets.NUGET_API_KEY}}

@@ -15,6 +15,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Minio.IntegrationTests", "M
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Minio.Examples.Simple", "Minio.Examples.Simple\Minio.Examples.Simple.csproj", "{7E8B7A9F-CD5D-44F0-9E71-8D8AE281BB3A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GitHub", "GitHub", "{4E8E49B2-A2A9-4ED3-8270-CADDA83A0BEA}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\dotnet.yml = .github\workflows\dotnet.yml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,5 +46,8 @@ Global
 		{7E8B7A9F-CD5D-44F0-9E71-8D8AE281BB3A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7E8B7A9F-CD5D-44F0-9E71-8D8AE281BB3A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7E8B7A9F-CD5D-44F0-9E71-8D8AE281BB3A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4E8E49B2-A2A9-4ED3-8270-CADDA83A0BEA} = {72C1F715-BD16-4F7F-9E52-111B815E7348}
 	EndGlobalSection
 EndGlobal
