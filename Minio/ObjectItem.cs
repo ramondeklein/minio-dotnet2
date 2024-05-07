@@ -1,4 +1,6 @@
-﻿namespace Minio;
+﻿using System.Net.Http.Headers;
+
+namespace Minio;
 
 public class PartItem
 {
@@ -20,6 +22,13 @@ public class ObjectItem
     public required long Size { get; init; }
     public required string StorageClass { get; init; }
     public required DateTimeOffset LastModified { get; init; }
+    
+    // The following properties are only present when metadata
+    // is requested during listing (MinIO specific feature)
+    public MediaTypeHeaderValue? ContentType { get; init; }
+    public DateTimeOffset? Expires { get; init; }
+
+    public IReadOnlyDictionary<string, string> UserMetadata { get; init; }
 }
 
 public class UploadItem

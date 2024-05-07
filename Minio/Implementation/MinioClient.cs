@@ -127,15 +127,15 @@ internal class MinioClient : IMinioClient
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<CreateMultipartUploadResult> CreateMultipartUploadAsync(string bucketName, string objectName, CreateMultipartUploadOptions? options, CancellationToken cancellationToken)
+    public async Task<CreateMultipartUploadResult> CreateMultipartUploadAsync(string bucketName, string key, CreateMultipartUploadOptions? options, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
-        ArgumentException.ThrowIfNullOrEmpty(objectName);
+        ArgumentException.ThrowIfNullOrEmpty(key);
         
         var query = new QueryParams();
         query.Add("uploads", string.Empty);
         
-        using var req = CreateRequest(HttpMethod.Post, $"{bucketName}/{objectName}", query);
+        using var req = CreateRequest(HttpMethod.Post, $"{bucketName}/{key}", query);
 
         req
             .SetContentType(options?.ContentType)
@@ -164,7 +164,7 @@ internal class MinioClient : IMinioClient
         return new CreateMultipartUploadResult
         {
             Bucket = xResponse.Root?.Element(Ns + "Bucket")?.Value ?? bucketName,
-            Key = xResponse.Root?.Element(Ns + "Key")?.Value ?? objectName,
+            Key = xResponse.Root?.Element(Ns + "Key")?.Value ?? key,
             UploadId = xResponse.Root?.Element(Ns + "UploadId")?.Value ?? string.Empty,
             AbortDate = abortDate,
             AbortRuleId = abortRuleId,
@@ -172,10 +172,10 @@ internal class MinioClient : IMinioClient
         };
     }
 
-    public async Task<UploadPartResult> UploadPartAsync(string bucketName, string objectName, string uploadId, int partNumber, Stream stream, UploadPartOptions? options, CancellationToken cancellationToken)
+    public async Task<UploadPartResult> UploadPartAsync(string bucketName, string key, string uploadId, int partNumber, Stream stream, UploadPartOptions? options, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
-        ArgumentException.ThrowIfNullOrEmpty(objectName);
+        ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentException.ThrowIfNullOrEmpty(uploadId);
         if (partNumber < 1) throw new ArgumentOutOfRangeException(nameof(partNumber), "Part numbers start at 1");
 
@@ -183,7 +183,7 @@ internal class MinioClient : IMinioClient
         query.Add("partNumber", partNumber.ToString(CultureInfo.InvariantCulture));
         query.Add("uploadId", uploadId);
         
-        using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{objectName}", query);
+        using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}", query);
 
         req.Content = new StreamContent(stream);
         req
@@ -202,10 +202,10 @@ internal class MinioClient : IMinioClient
         };
     }
 
-    public async Task<CompleteMultipartUploadResult> CompleteMultipartUploadAsync(string bucketName, string objectName, string uploadId, IEnumerable<PartInfo> parts, CompleteMultipartUploadOptions? options, CancellationToken cancellationToken)
+    public async Task<CompleteMultipartUploadResult> CompleteMultipartUploadAsync(string bucketName, string key, string uploadId, IEnumerable<PartInfo> parts, CompleteMultipartUploadOptions? options, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
-        ArgumentException.ThrowIfNullOrEmpty(objectName);
+        ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentException.ThrowIfNullOrEmpty(uploadId);
         
         var query = new QueryParams();
@@ -237,7 +237,7 @@ internal class MinioClient : IMinioClient
             xml.Add(xPart);
         }
 
-        using var req = CreateRequest(HttpMethod.Post, $"{bucketName}/{objectName}", xml, query);
+        using var req = CreateRequest(HttpMethod.Post, $"{bucketName}/{key}", xml, query);
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -256,23 +256,23 @@ internal class MinioClient : IMinioClient
         };
     }
     
-    public async Task AbortMultipartUploadAsync(string bucketName, string objectName, string uploadId, CancellationToken cancellationToken)
+    public async Task AbortMultipartUploadAsync(string bucketName, string key, string uploadId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
-        ArgumentException.ThrowIfNullOrEmpty(objectName);
+        ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentException.ThrowIfNullOrEmpty(uploadId);
 
         var query = new QueryParams();
         query.Add("uploadId", uploadId);
 
-        using var req = CreateRequest(HttpMethod.Delete, $"{bucketName}/{objectName}", query);
+        using var req = CreateRequest(HttpMethod.Delete, $"{bucketName}/{key}", query);
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task PutObjectAsync(string bucketName, string objectName, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
+    public async Task PutObjectAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
-        ArgumentException.ThrowIfNullOrEmpty(objectName);
+        ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(stream);
 
         var disableMultipart = false;
@@ -293,26 +293,26 @@ internal class MinioClient : IMinioClient
         //     var concurrentStreamParts = options?.ConcurrentStreamParts ?? false;
         //     var numThreads = options?.NumThreads ?? 0;
         //     if (concurrentStreamParts && numThreads > 1)
-        //         await PutObjectMultipartStreamParallelAsync(bucketName, objectName, stream, options, cancellationToken).ConfigureAwait(false);
+        //         await PutObjectMultipartStreamParallelAsync(bucketName, key, stream, options, cancellationToken).ConfigureAwait(false);
         //     else
-        //         await PutObjectMultipartStreamNoLength(bucketName, objectName, stream, options, cancellationToken).ConfigureAwait(false);
+        //         await PutObjectMultipartStreamNoLength(bucketName, key, stream, options, cancellationToken).ConfigureAwait(false);
         // }
         // else
         // {
         //     if (stream.Length < partSize)
-                await PutObjectCoreAsync(bucketName, objectName, stream, options, cancellationToken).ConfigureAwait(false);
+                await PutObjectCoreAsync(bucketName, key, stream, options, cancellationToken).ConfigureAwait(false);
         //     else
-        //         await PutObjectMultipartStream(bucketName, objectName, stream, options, cancellationToken).ConfigureAwait(false);
+        //         await PutObjectMultipartStream(bucketName, key, stream, options, cancellationToken).ConfigureAwait(false);
         // }
     }
     //
-    // private async Task PutObjectMultipartStreamParallelAsync(string bucketName, string objectName, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
+    // private async Task PutObjectMultipartStreamParallelAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
     // {
     //     if (options?.SendContentMd5 ?? false)
     //         options.UserMetadata["X-Amz-Checksum-Algorithm"] = "CRC32C";
     //     
     //     var (totalPartsCount, partSize, _) = OptimalPartInfo(-1, options?.PartSize ?? 0);
-    //     var uploadId = await NewUploadIdAsync(bucketName, objectName, options, cancellationToken).ConfigureAwait(false);
+    //     var uploadId = await NewUploadIdAsync(bucketName, key, options, cancellationToken).ConfigureAwait(false);
     //
     //     options?.UserMetadata.Remove("X-Amz-Checksum-Algorithm");
     //
@@ -351,7 +351,7 @@ internal class MinioClient : IMinioClient
     //                 if (options?.SendContentMd5 ?? false)
     //                     md5base64 = Convert.ToBase64String(MD5.HashData(buf.Span));
     //
-    //                 Task task = UploadPartAsync(bucketName, objectName, uploadId, buf.Span, partNumber, md5base64, read, options?.ServerSideEncryption ?? false, !(options?.DisableContentSha256 ?? false), customHeader, cancellationToken);
+    //                 Task task = UploadPartAsync(bucketName, key, uploadId, buf.Span, partNumber, md5base64, read, options?.ServerSideEncryption ?? false, !(options?.DisableContentSha256 ?? false), customHeader, cancellationToken);
     //                 task.ContinueWith()
     //                 
     //                 {
@@ -369,14 +369,14 @@ internal class MinioClient : IMinioClient
     //     }
     //     catch
     //     {
-    //         await AbortMultipartUploadAsync(bucketName, objectName, uploadId, cancellationToken).ConfigureAwait(false);
+    //         await AbortMultipartUploadAsync(bucketName, key, uploadId, cancellationToken).ConfigureAwait(false);
     //         throw;
     //     }
     // }
     //
-    private async Task PutObjectCoreAsync(string bucketName, string objectName, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
+    private async Task PutObjectCoreAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
     {
-        using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{objectName}");
+        using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}");
     
         req.Content = new StreamContent(stream);
         req
@@ -401,30 +401,30 @@ internal class MinioClient : IMinioClient
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<ObjectInfo> HeadObjectAsync(string bucketName, string objectName, GetObjectOptions? options = null, CancellationToken cancellationToken = default)
+    public async Task<ObjectInfo> HeadObjectAsync(string bucketName, string key, GetObjectOptions? options = null, CancellationToken cancellationToken = default)
     {
-        var resp = await GetOrHeadObjectAsync(HttpMethod.Head, bucketName, objectName, options, cancellationToken).ConfigureAwait(false);
-        return ToObjectInfo(objectName, resp);
+        var resp = await GetOrHeadObjectAsync(HttpMethod.Head, bucketName, key, options, cancellationToken).ConfigureAwait(false);
+        return ToObjectInfo(key, resp);
     }
 
-    public async Task<(Stream, ObjectInfo)> GetObjectAsync(string bucketName, string objectName, GetObjectOptions? options, CancellationToken cancellationToken)
+    public async Task<(Stream, ObjectInfo)> GetObjectAsync(string bucketName, string key, GetObjectOptions? options, CancellationToken cancellationToken)
     {
-        var resp = await GetOrHeadObjectAsync(HttpMethod.Get, bucketName, objectName, options, cancellationToken).ConfigureAwait(false);
+        var resp = await GetOrHeadObjectAsync(HttpMethod.Get, bucketName, key, options, cancellationToken).ConfigureAwait(false);
         var stream = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        var objectInfo = ToObjectInfo(objectName, resp);
+        var objectInfo = ToObjectInfo(key, resp);
         return (stream, objectInfo);
     }
 
-    private async Task<HttpResponseMessage> GetOrHeadObjectAsync(HttpMethod httpMethod, string bucketName, string objectName, GetObjectOptions? options, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> GetOrHeadObjectAsync(HttpMethod httpMethod, string bucketName, string key, GetObjectOptions? options, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
-        ArgumentException.ThrowIfNullOrEmpty(objectName);
+        ArgumentException.ThrowIfNullOrEmpty(key);
 
         var q = new QueryParams();
         q.AddIfNotNullOrEmpty("versionId", options?.VersionId);
         if (options?.PartNumber != null)
             q.AddIfNotNullOrEmpty("partNumber", options.PartNumber.Value.ToString(CultureInfo.InvariantCulture));
-        using var req = CreateRequest(httpMethod, $"{bucketName}/{objectName}", q);
+        using var req = CreateRequest(httpMethod, $"{bucketName}/{key}", q);
 
         options?.ServerSideEncryption?.WriteHeaders(req.Headers);
         if (options?.CheckSum ?? false)
@@ -457,7 +457,7 @@ internal class MinioClient : IMinioClient
         return await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async IAsyncEnumerable<ObjectItem> ListObjectsAsync(string bucketName, string? continuationToken, string? delimiter, string? encodingType, string? fetchOwner, int maxKeys, string? prefix, string? startAfter, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<ObjectItem> ListObjectsAsync(string bucketName, string? continuationToken, string? delimiter, string? encodingType, bool includeMetadata, string? fetchOwner, int pageSize, string? prefix, string? startAfter, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
 
@@ -468,9 +468,11 @@ internal class MinioClient : IMinioClient
             q.AddIfNotNullOrEmpty("continuation-token", continuationToken);
             q.AddIfNotNullOrEmpty("delimiter", delimiter);
             q.AddIfNotNullOrEmpty("encoding-type", encodingType);
+            if (includeMetadata)
+                q.Add("metadata", "true");
             q.AddIfNotNullOrEmpty("fetch-owner", fetchOwner);
-            if (maxKeys > 0)
-                q.Add("max-keys", maxKeys.ToString(CultureInfo.InvariantCulture));
+            if (pageSize > 0)
+                q.Add("max-keys", pageSize.ToString(CultureInfo.InvariantCulture));
             q.AddIfNotNullOrEmpty("prefix", prefix);
             q.AddIfNotNullOrEmpty("start-after", startAfter);
             using var req = CreateRequest(HttpMethod.Get, bucketName, q);
@@ -482,14 +484,37 @@ internal class MinioClient : IMinioClient
 
             foreach (var xContent in xResponse.Root!.Elements(Ns + "Contents"))
             {
+                MediaTypeHeaderValue? contentType = null;
+                DateTimeOffset? expires = null;
+                var userMetaData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (includeMetadata)
+                {
+                    var xUserMetadata = xContent.Element(Ns + "UserMetadata");
+                    if (xUserMetadata == null)
+                        throw new InvalidOperationException("Client doesn't support metadata while listing objects (MinIO specific feature)");
+
+                    contentType = MediaTypeHeaderValue.TryParse(xUserMetadata.Element(Ns + "content-type")?.Value, out var ct) ? ct : null;
+                    expires = DateTimeOffset.TryParseExact(xUserMetadata.Element(Ns + "expires")?.Value, "r", CultureInfo.InvariantCulture, DateTimeStyles.None, out var v) ? v : null;
+                    const string metaElementPrefix = "X-Amz-Meta-";
+                    foreach (var xHeader in xUserMetadata.Elements().Where(x => x.Name.Namespace == Ns && x.Name.LocalName.StartsWith(metaElementPrefix, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var key = xHeader.Name.LocalName[metaElementPrefix.Length..];
+                        userMetaData[key] = xHeader.Value;
+                    }
+                }
+
                 var objItem = new ObjectItem
                 {
                     Key = xContent.Element(Ns + "Key")?.Value ?? string.Empty,
                     ETag = xContent.Element(Ns + "ETag")?.Value ?? string.Empty,
                     Size = long.TryParse(xContent.Element(Ns + "Size")?.Value, out var size) ? size : -1,
                     StorageClass = xContent.Element(Ns + "Key")?.Value ?? string.Empty,
-                    LastModified = DateTimeOffset.ParseExact(xContent.Element(Ns + "LastModified")?.Value ?? string.Empty, "s", CultureInfo.InvariantCulture)
+                    LastModified = xContent.Element(Ns + "LastModified")?.Value.ParseIsoTimestamp() ?? DateTimeOffset.MinValue,
+                    ContentType = contentType,
+                    Expires = expires,
+                    UserMetadata = userMetaData
                 };
+
                 yield return objItem;
             }
             
@@ -499,18 +524,18 @@ internal class MinioClient : IMinioClient
         }
     }
 
-    public async IAsyncEnumerable<PartItem> ListPartsAsync(string bucketName, string objectName, string uploadId, int maxParts, string? partNumberMarker, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<PartItem> ListPartsAsync(string bucketName, string key, string uploadId, int pageSize, string? partNumberMarker, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
 
         while (true)
         {
             var q = new QueryParams();
-            if (maxParts > 0)
-                q.Add("max-parts", maxParts.ToString(CultureInfo.InvariantCulture));
+            if (pageSize > 0)
+                q.Add("max-parts", pageSize.ToString(CultureInfo.InvariantCulture));
             q.AddIfNotNullOrEmpty("part-number-marker", partNumberMarker);
             q.AddIfNotNullOrEmpty("uploadId", uploadId);
-            using var req = CreateRequest(HttpMethod.Get, $"{bucketName}/{objectName}", q);
+            using var req = CreateRequest(HttpMethod.Get, $"{bucketName}/{key}", q);
 
             var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
@@ -537,7 +562,7 @@ internal class MinioClient : IMinioClient
             if (!isTruncated) break;
         }
     }
-    public async IAsyncEnumerable<UploadItem> ListMultipartUploadsAsync(string bucketName, string? delimiter, string? encodingType, string? keyMarker, int maxUploads, string? prefix, string? uploadIdMarker, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<UploadItem> ListMultipartUploadsAsync(string bucketName, string? delimiter, string? encodingType, string? keyMarker, int pageSize, string? prefix, string? uploadIdMarker, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
 
@@ -548,8 +573,8 @@ internal class MinioClient : IMinioClient
             q.AddIfNotNullOrEmpty("delimiter", delimiter);
             q.AddIfNotNullOrEmpty("encoding-type", encodingType);
             q.AddIfNotNullOrEmpty("key-marker", keyMarker);
-            if (maxUploads > 0)
-                q.Add("max-uploads", maxUploads.ToString(CultureInfo.InvariantCulture));
+            if (pageSize > 0)
+                q.Add("max-uploads", pageSize.ToString(CultureInfo.InvariantCulture));
             q.AddIfNotNullOrEmpty("prefix", prefix);
             q.AddIfNotNullOrEmpty("upload-id-marker", uploadIdMarker);
             using var req = CreateRequest(HttpMethod.Get, bucketName, q);
@@ -636,7 +661,7 @@ internal class MinioClient : IMinioClient
     
     //public readonly record struct PartInfo(int TotalPartsCount, int PartSize, int LastPartSize);
 
-    private static ObjectInfo ToObjectInfo(string objectName, HttpResponseMessage resp)
+    private static ObjectInfo ToObjectInfo(string key, HttpResponseMessage resp)
     {
         var etag = resp.Headers.ETag!;
         var contentLength = resp.Content.Headers.ContentLength!;
@@ -646,12 +671,14 @@ internal class MinioClient : IMinioClient
         var versionId = resp.Headers.TryGetValue("X-Amz-Version-Id");
         var replicationStatus = resp.Headers.TryGetValue("X-Amz-Replication-Status");
         
+        // Headers are case-insensitive, so the metadata
         var metadata =
             resp.Headers
                 .Where(kv => PreserveKeys.Any(k => kv.Key.StartsWith(k, StringComparison.OrdinalIgnoreCase)))
                 .ToDictionary(
                     kv => kv.Key, 
-                    kv => string.Join(",", kv.Value));
+                    kv => string.Join(",", kv.Value),
+                    StringComparer.OrdinalIgnoreCase);
 
         const string metaPrefix = "X-Amz-Meta-"; 
         var userMetadata = 
@@ -659,15 +686,16 @@ internal class MinioClient : IMinioClient
                 .Where(kv => kv.Key.StartsWith(metaPrefix, StringComparison.OrdinalIgnoreCase))
                 .ToDictionary(
                     kv => kv.Key[metaPrefix.Length..], 
-                    kv => string.Join(",", kv.Value));
-        var userTags = new Dictionary<string, string>();
+                    kv => string.Join(",", kv.Value),
+                    StringComparer.OrdinalIgnoreCase);
+        var userTags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var value in resp.Headers.TryGetValues("X-Amz-Tagging"))
         {
             var qs = HttpUtility.ParseQueryString(value);
-            foreach (var key in qs.AllKeys)
+            foreach (var k in qs.AllKeys)
             {
-                if (key != null)
-                    userTags[key] = qs[key] ?? string.Empty;
+                if (k != null)
+                    userTags[k] = qs[k] ?? string.Empty;
             }
         }
         var tagCount = int.Parse(resp.Headers.TryGetValue("X-Amz-Tagging-Count") ?? "0", CultureInfo.InvariantCulture);
@@ -703,7 +731,7 @@ internal class MinioClient : IMinioClient
         return new ObjectInfo
         {
             Etag = etag,
-            Key = objectName,
+            Key = key,
             ContentLength = contentLength,
             LastModified = lastModified,
             ContentType = contentType,

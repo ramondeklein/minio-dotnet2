@@ -7,8 +7,8 @@ public class PutObjectOptions
     public IServerSideEncryption? ServerSideEncryption { get; set; }
     public string? IfMatchETag { get; set; }
     public string? IfMatchETagExcept { get; set; }
-    public IDictionary<string, string> UserMetadata { get; } = new Dictionary<string, string>();
-    public IDictionary<string, string> UserTags { get; } = new Dictionary<string, string>();
+    public IDictionary<string, string> UserMetadata { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IDictionary<string, string> UserTags { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public MediaTypeHeaderValue? ContentType { get; set; }
     public ICollection<string>? ContentEncoding { get; set; }
     public ContentDispositionHeaderValue? ContentDisposition { get; set; }

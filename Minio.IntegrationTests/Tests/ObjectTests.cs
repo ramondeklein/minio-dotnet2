@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using Minio.Model;
 using Xunit;
@@ -57,6 +58,73 @@ public class ObjectTests : MinioTest
     }
 
     [Fact]
+    public async Task TestListObjects()
+    {
+        const int objectSize = 256;
+        const int parallelUploads = 100;
+
+        var client = CreateClient();
+        var createBucketOptions = new CreateBucketOptions
+        {
+            ObjectLocking = true,
+        };
+        await client.CreateBucketAsync(BucketName, createBucketOptions).ConfigureAwait(true);
+
+        // Write out 100 objects in parallel
+        var buffer = new byte[objectSize];
+        for (var i = 0; i < buffer.Length; ++i)
+            buffer[i] = (byte)i;
+
+        await Task.WhenAll(Enumerable.Range(0, parallelUploads).Select(async i =>
+        {
+            var ms = new MemoryStream(buffer, false);
+            await using (ms.ConfigureAwait(false))
+            {
+                var opts = new PutObjectOptions
+                {
+                    UserMetadata =
+                    {
+                        { "FixedKey", "Minio-test" },
+                        { "VariableKey", $"Value-{i}" },
+                    },
+                    UserTags =
+                    {
+                        { "VariableTag", $"Tag-{i}"}
+                    }
+                };
+                await client.PutObjectAsync(BucketName, $"test-{i:D04}", ms, opts).ConfigureAwait(false);
+            }
+        })).ConfigureAwait(true);
+
+        // Read an object file
+        var (stream, objectInfo) = await client.GetObjectAsync(BucketName, "test-0000").ConfigureAwait(true);
+        Assert.Equal(1, objectInfo.UserTagCount);
+        Assert.Equal(objectSize, objectInfo.ContentLength);
+        Assert.Equal("Minio-test", objectInfo.UserMetadata["FixedKey"]);
+        Assert.Equal("Value-0", objectInfo.UserMetadata["VariableKey"]);
+        await using (stream.ConfigureAwait(false))
+        {
+            var readBuffer = new byte[objectSize+10];
+            var readBytes = await stream.ReadAsync(readBuffer).ConfigureAwait(true);
+            Assert.Equal(objectSize, readBytes);
+            for (var i = 0; i < readBytes; ++i)
+                Assert.Equal((byte)i, readBuffer[i]);
+        }
+
+        // List all objects starting with "test-" in the test-bucket
+        // (max 10 objects at a time)
+        await foreach (var objItem in client.ListObjectsAsync(BucketName, prefix: "test-", delimiter: "/", includeMetadata: true, pageSize: 10, encodingType: "url"))
+        {
+            Assert.StartsWith("test-", objItem.Key, StringComparison.Ordinal);
+            if (!int.TryParse(objItem.Key[5..], out var i))
+                Assert.Fail("Unable to parse index from key");
+            Assert.Equal(objectSize, objItem.Size);
+            Assert.Equal("Minio-test", objItem.UserMetadata["FixedKey"]);
+            Assert.Equal($"Value-{i}", objItem.UserMetadata["VariableKey"]);
+        }
+    }
+
+    [Fact]
     public async Task TestMultipartUpload()
     {
         var client = CreateClient();
@@ -93,7 +161,7 @@ public class ObjectTests : MinioTest
         var end = DateTimeOffset.Now.AddSeconds(3);
         
         // List all parts
-        var partItems = await client.ListPartsAsync(BucketName, ObjectKey, createResult.UploadId, maxParts: 5).ToListAsync().ConfigureAwait(true);
+        var partItems = await client.ListPartsAsync(BucketName, ObjectKey, createResult.UploadId, pageSize: 5).ToListAsync().ConfigureAwait(true);
         Assert.Equal(totalParts, partItems.Count);
         
         // Verify part information
@@ -129,7 +197,7 @@ public class ObjectTests : MinioTest
 
         // We should have 1 uploads
         // IMPORTANT: In MinIO this call is only able to list when a prefix is set to an exact object-name
-        var uploads1 = await client.ListMultipartUploadsAsync(BucketName, prefix: ObjectKey, maxUploads: 10).ToListAsync().ConfigureAwait(true);
+        var uploads1 = await client.ListMultipartUploadsAsync(BucketName, prefix: ObjectKey, pageSize: 10).ToListAsync().ConfigureAwait(true);
         Assert.Single(uploads1);
 
         // Abort all uploads
