@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
@@ -7,10 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
-using System.Xml;
 using System.Xml.Linq;
-using System.Xml.Serialization;
-using System.Xml.XPath;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Minio.Helpers;
@@ -26,7 +22,8 @@ namespace Minio.Implementation;
 
 internal class MinioClient : IMinioClient
 {
-    private static readonly XNamespace Ns = "http://s3.amazonaws.com/doc/2006-03-01/";
+    private static readonly XNamespace Ns = Constants.S3Ns;
+    
     private const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
     private static readonly Regex ExpirationRegex = new("expiry-date=\"(.*?)\", rule-id=\"(.*?)\"", RegexOptions.Compiled);
     private static readonly Regex RestoreRegex = new("ongoing-request=\"(.*?)\"(, expiry-date=\"(.*?)\")?", RegexOptions.Compiled);
@@ -600,6 +597,35 @@ internal class MinioClient : IMinioClient
             var isTruncated = xResponse.Root!.Element(Ns + "IsTruncated")?.Value == "true";
             if (!isTruncated) break;
         }
+    }
+
+    public async Task<BucketNotification> GetBucketNotificationsAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        
+        var query = new QueryParams();
+        query.Add("notification", string.Empty);
+        
+        using var req = CreateRequest(HttpMethod.Get, bucketName, query);
+        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+
+        var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
+
+        return BucketNotification.Deserialize(xResponse.Root!);
+    }
+
+    public async Task SetBucketNotificationsAsync(string bucketName, BucketNotification bucketNotification, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        
+        var query = new QueryParams();
+        query.Add("notification", string.Empty);
+
+        var xml = bucketNotification.Serialize();
+        
+        using var req = CreateRequest(HttpMethod.Put, bucketName, xml, query);
+        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<HttpResponseMessage> SendRequestAsync(HttpRequestMessage req, CancellationToken cancellationToken)

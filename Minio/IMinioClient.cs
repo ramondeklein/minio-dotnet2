@@ -21,4 +21,7 @@ public interface IMinioClient
     IAsyncEnumerable<ObjectItem> ListObjectsAsync(string bucketName, string? continuationToken = null, string? delimiter = null, string? encodingType = null, bool includeMetadata = false, string? fetchOwner = null, int pageSize = 0, string? prefix = null, string? startAfter = null, CancellationToken cancellationToken = default);
     IAsyncEnumerable<PartItem> ListPartsAsync(string bucketName, string key, string uploadId, int pageSize = 0, string? partNumberMarker = null, CancellationToken cancellationToken = default);
     IAsyncEnumerable<UploadItem> ListMultipartUploadsAsync(string bucketName, string? delimiter = null, string? encodingType = null, string? keyMarker = null, int pageSize = 0, string? prefix = null, string? uploadIdMarker = null, CancellationToken cancellationToken = default);
+    
+    Task<BucketNotification> GetBucketNotificationsAsync(string bucketName, CancellationToken cancellationToken = default);
+    Task SetBucketNotificationsAsync(string bucketName, BucketNotification bucketNotification, CancellationToken cancellationToken = default);
 }
