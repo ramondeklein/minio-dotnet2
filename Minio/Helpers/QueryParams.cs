@@ -46,22 +46,16 @@ internal class QueryParams
         foreach (var (name, values) in _params)
         {
             sb.Append(sb.Length == 0 ? "?" : "&");
-            var encodedName = AwsUriEncode(name);
+            var encodedName = Uri.EscapeDataString(name);
             foreach (var value in values)
             {
                 sb.Append(encodedName);
                 sb.Append('=');
                 if (!string.IsNullOrEmpty(value))
-                    sb.Append(AwsUriEncode(value));
+                    sb.Append(Uri.EscapeDataString(value));
             }
         }
 
         return sb.ToString();
-    }
-
-    private static string AwsUriEncode(string text)
-    {
-        // AWS requires URL encoding where HEX values are in uppercase
-        return System.Net.WebUtility.UrlEncode(text);
     }
 }
