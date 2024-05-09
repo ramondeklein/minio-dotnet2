@@ -2,8 +2,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Web;
 using System.Xml.Linq;
@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Minio.Helpers;
 using Minio.Model;
+using Minio.Model.Notification;
 
 #if NET6_0
 using ArgumentException = Shims.ArgumentException; 
@@ -626,6 +627,46 @@ internal class MinioClient : IMinioClient
         
         using var req = CreateRequest(HttpMethod.Put, bucketName, xml, query);
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IAsyncEnumerable<BucketNotificationEvent>> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix, string suffix, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        if (events == null) throw new System.ArgumentNullException(nameof(events));
+
+        var eventText = string.Join(",", events);
+        if (string.IsNullOrEmpty(eventText))
+            throw new System.ArgumentException("No events specified", nameof(events));
+
+        var query = new QueryParams();
+        query.Add("ping", "10");
+        query.Add("events", eventText);
+        query.AddIfNotNullOrEmpty("prefix", prefix);
+        query.AddIfNotNullOrEmpty("suffix", suffix);
+
+        using var req = CreateRequest(HttpMethod.Get, bucketName, query);
+        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        return ListenAsync(cancellationToken);
+
+        async IAsyncEnumerable<BucketNotificationEvent> ListenAsync([EnumeratorCancellation] CancellationToken ct)
+        {
+            var responseBody = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            await using (responseBody.ConfigureAwait(false))
+            {
+                using var sr = new StreamReader(responseBody);
+                while (!sr.EndOfStream)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var line = await sr.ReadLineAsync().ConfigureAwait(false);
+                    if (string.IsNullOrEmpty(line))
+                        break;
+
+                    var bucketNotificationEvent = JsonSerializer.Deserialize<BucketNotificationEvent>(line);
+                    if (bucketNotificationEvent != null)
+                        yield return bucketNotificationEvent;
+                }
+            }
+        }
     }
 
     private async Task<HttpResponseMessage> SendRequestAsync(HttpRequestMessage req, CancellationToken cancellationToken)
