@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Minio;
+using Minio.Model;
 
 // Ensure that Minio is running:
 //   docker run --rm -p 9000:9000 quay.io/minio/minio:latest server /data
@@ -29,6 +30,17 @@ const string testBucket = "testbucket";
 var hasBucket = await minioClient.HeadBucketAsync(testBucket).ConfigureAwait(false);
 if (!hasBucket)
     await minioClient.CreateBucketAsync(testBucket).ConfigureAwait(false);
+
+// Listen for all bucket events
+using var subscription = minioClient
+    .ListenBucketNotificationsAsync(testBucket, new[]
+    {
+        EventType.ObjectCreatedAll,
+        EventType.ObjectAccessedAll,
+        EventType.ObjectRemovedAll,
+    })
+    .ToObservable()
+    .Subscribe(e => Console.WriteLine($"{e.S3.Bucket.Name}:{e.S3.Object.Key} - {e.EventName}"));
 
 // Write out 100 objects in parallel
 var buffer = new byte[256];
