@@ -11,7 +11,7 @@ public static class MinioClientExtensions
         return client.SetBucketNotificationsAsync(bucketName, new BucketNotification(), cancellationToken);
     }
 
-    public static Task<IAsyncEnumerable<BucketNotificationEvent>> ListenBucketNotificationsAsync(this IMinioClient client, string bucketName, EventType eventType, string prefix = "", string suffix = "", CancellationToken cancellationToken = default)
+    public static IAsyncEnumerable<NotificationEvent> ListenBucketNotificationsAsync(this IMinioClient client, string bucketName, EventType eventType, string prefix = "", string suffix = "", CancellationToken cancellationToken = default)
     {
         if (client == null) throw new ArgumentNullException(nameof(client));
         return client.ListenBucketNotificationsAsync(bucketName, new[] { eventType }, prefix, suffix, cancellationToken);

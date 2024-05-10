@@ -90,31 +90,31 @@ public class BucketNotificationTests
             Assert.Equal(EventType.ObjectCreatedPut, bucketNotificationEvent.EventName);
             Assert.Equal($"{bucketName}/{key}", bucketNotificationEvent.Key);
             Assert.Single(bucketNotificationEvent.Records);
-            var record = bucketNotificationEvent.Records[0];
-            Assert.Equal("2.0", record.EventVersion);
-            Assert.Equal("minio:s3", record.EventSource);
-            Assert.Equal("", record.AwsRegion);
-            Assert.Equal(EventType.ObjectCreatedPut, record.EventName);
-            Assert.Equal(minioContainer.GetAccessKey(), record.UserIdentity.PrincipalId);
-            Assert.Equal(minioContainer.GetAccessKey(), record.RequestParameters["principalId"]);
-            Assert.Equal("", record.RequestParameters["region"]);
-            Assert.True(IPAddress.TryParse(record.RequestParameters["sourceIPAddress"], out _));
-            Assert.NotEmpty(record.ResponseElements["x-amz-id-2"]);
-            Assert.NotEmpty(record.ResponseElements["x-amz-request-id"]);
-            Assert.NotEmpty(record.ResponseElements["x-minio-deployment-id"]);
-            Assert.Equal($"http://{minioContainer.IpAddress}:9000", record.ResponseElements["x-minio-origin-endpoint"]);
-            Assert.Equal("1.0", record.S3.SchemaVersion);
-            Assert.Equal("Config", record.S3.ConfigurationId);
-            Assert.Equal(bucketName, record.S3.Bucket.Name);
-            Assert.Equal(minioContainer.GetAccessKey(), record.S3.Bucket.OwnerIdentity.PrincipalId);
-            Assert.Equal($"arn:aws:s3:::{bucketName}", record.S3.Bucket.Arn);
-            Assert.Equal(key, record.S3.Object.Key);
-            Assert.Equal((ulong)testData.Length, record.S3.Object.Size);
-            Assert.Equal("3e25960a79dbc69b674cd4ec67a72c62", record.S3.Object.Etag);
-            Assert.Equal(contentType, record.S3.Object.ContentType);
-            Assert.Equal(contentType, record.S3.Object.UserMetadata["content-type"]);
-            Assert.NotEmpty(record.S3.Object.Sequencer);
-            Assert.True(IPAddress.TryParse(record.Source.Host, out _));
+            var notificationEvent = bucketNotificationEvent.Records[0];
+            Assert.Equal("2.0", notificationEvent.EventVersion);
+            Assert.Equal("minio:s3", notificationEvent.EventSource);
+            Assert.Equal("", notificationEvent.AwsRegion);
+            Assert.Equal(EventType.ObjectCreatedPut, notificationEvent.EventName);
+            Assert.Equal(minioContainer.GetAccessKey(), notificationEvent.UserIdentity.PrincipalId);
+            Assert.Equal(minioContainer.GetAccessKey(), notificationEvent.RequestParameters["principalId"]);
+            Assert.Equal("", notificationEvent.RequestParameters["region"]);
+            Assert.True(IPAddress.TryParse(notificationEvent.RequestParameters["sourceIPAddress"], out _));
+            Assert.NotEmpty(notificationEvent.ResponseElements["x-amz-id-2"]);
+            Assert.NotEmpty(notificationEvent.ResponseElements["x-amz-request-id"]);
+            Assert.NotEmpty(notificationEvent.ResponseElements["x-minio-deployment-id"]);
+            Assert.Equal($"http://{minioContainer.IpAddress}:9000", notificationEvent.ResponseElements["x-minio-origin-endpoint"]);
+            Assert.Equal("1.0", notificationEvent.S3.SchemaVersion);
+            Assert.Equal("Config", notificationEvent.S3.ConfigurationId);
+            Assert.Equal(bucketName, notificationEvent.S3.Bucket.Name);
+            Assert.Equal(minioContainer.GetAccessKey(), notificationEvent.S3.Bucket.OwnerIdentity.PrincipalId);
+            Assert.Equal($"arn:aws:s3:::{bucketName}", notificationEvent.S3.Bucket.Arn);
+            Assert.Equal(key, notificationEvent.S3.Object.Key);
+            Assert.Equal((ulong)testData.Length, notificationEvent.S3.Object.Size);
+            Assert.Equal("3e25960a79dbc69b674cd4ec67a72c62", notificationEvent.S3.Object.Etag);
+            Assert.Equal(contentType, notificationEvent.S3.Object.ContentType);
+            Assert.Equal(contentType, notificationEvent.S3.Object.UserMetadata["content-type"]);
+            Assert.NotEmpty(notificationEvent.S3.Object.Sequencer);
+            Assert.True(IPAddress.TryParse(notificationEvent.Source.Host, out _));
 
             // Verify the bucket notification
             var returnedBucketNotification = await client.GetBucketNotificationsAsync(bucketName).ConfigureAwait(true);
@@ -141,12 +141,15 @@ public class BucketNotificationTests
 
         await client.CreateBucketAsync(bucketName).ConfigureAwait(true);
 
-        var tsc = new TaskCompletionSource<BucketNotificationEvent>();
-        var bucketNotifications = await client.ListenBucketNotificationsAsync(bucketName, EventType.ObjectCreatedAll).ConfigureAwait(true); 
+        var tsc = new TaskCompletionSource<NotificationEvent>();
+        var bucketNotifications = client.ListenBucketNotificationsAsync(bucketName, EventType.ObjectCreatedAll); 
         using var subscription = bucketNotifications.ToObservable().Subscribe(e => tsc.TrySetResult(e));
-
-        // Wensure the listen action is actually submitted
-        await Task.Delay(500000).ConfigureAwait(true);
+        
+        // Wait a small delay, because listening for bucket events is an async
+        // operation too and isn't confirmed. It will only return after the
+        // first ping (10 seconds). The only solution is to wait a little to
+        // ensure the command has been processed.
+        await Task.Delay(50).ConfigureAwait(true);
 
         // Write the object
         var testData = "Hello world"u8.ToArray();
@@ -157,37 +160,33 @@ public class BucketNotificationTests
         }).ConfigureAwait(true);
 
         // Wait until the NATS notification comes in
-        var bucketNotificationEvent = await tsc.Task.ConfigureAwait(true);
+        var notificationEvent = await tsc.Task.ConfigureAwait(true);
 
         // Check the result of the event
         // (also checks JSON deserialization)
-        Assert.Equal(EventType.ObjectCreatedPut, bucketNotificationEvent.EventName);
-        Assert.Equal($"{bucketName}/{key}", bucketNotificationEvent.Key);
-        Assert.Single(bucketNotificationEvent.Records);
-        var record = bucketNotificationEvent.Records[0];
-        Assert.Equal("2.0", record.EventVersion);
-        Assert.Equal("minio:s3", record.EventSource);
-        Assert.Equal("", record.AwsRegion);
-        Assert.Equal(EventType.ObjectCreatedPut, record.EventName);
-        Assert.Equal(minioContainer.GetAccessKey(), record.UserIdentity.PrincipalId);
-        Assert.Equal(minioContainer.GetAccessKey(), record.RequestParameters["principalId"]);
-        Assert.Equal("", record.RequestParameters["region"]);
-        Assert.True(IPAddress.TryParse(record.RequestParameters["sourceIPAddress"], out _));
-        Assert.NotEmpty(record.ResponseElements["x-amz-id-2"]);
-        Assert.NotEmpty(record.ResponseElements["x-amz-request-id"]);
-        Assert.NotEmpty(record.ResponseElements["x-minio-deployment-id"]);
-        Assert.Equal($"http://{minioContainer.IpAddress}:9000", record.ResponseElements["x-minio-origin-endpoint"]);
-        Assert.Equal("1.0", record.S3.SchemaVersion);
-        Assert.Equal("Config", record.S3.ConfigurationId);
-        Assert.Equal(bucketName, record.S3.Bucket.Name);
-        Assert.Equal(minioContainer.GetAccessKey(), record.S3.Bucket.OwnerIdentity.PrincipalId);
-        Assert.Equal($"arn:aws:s3:::{bucketName}", record.S3.Bucket.Arn);
-        Assert.Equal(key, record.S3.Object.Key);
-        Assert.Equal((ulong)testData.Length, record.S3.Object.Size);
-        Assert.Equal("3e25960a79dbc69b674cd4ec67a72c62", record.S3.Object.Etag);
-        Assert.Equal(contentType, record.S3.Object.ContentType);
-        Assert.Equal(contentType, record.S3.Object.UserMetadata["content-type"]);
-        Assert.NotEmpty(record.S3.Object.Sequencer);
-        Assert.True(IPAddress.TryParse(record.Source.Host, out _));
+        Assert.Equal("2.0", notificationEvent.EventVersion);
+        Assert.Equal("minio:s3", notificationEvent.EventSource);
+        Assert.Equal("", notificationEvent.AwsRegion);
+        Assert.Equal(EventType.ObjectCreatedPut, notificationEvent.EventName);
+        Assert.Equal(minioContainer.GetAccessKey(), notificationEvent.UserIdentity.PrincipalId);
+        Assert.Equal(minioContainer.GetAccessKey(), notificationEvent.RequestParameters["principalId"]);
+        Assert.Equal("", notificationEvent.RequestParameters["region"]);
+        Assert.True(IPAddress.TryParse(notificationEvent.RequestParameters["sourceIPAddress"], out _));
+        Assert.NotEmpty(notificationEvent.ResponseElements["x-amz-id-2"]);
+        Assert.NotEmpty(notificationEvent.ResponseElements["x-amz-request-id"]);
+        Assert.NotEmpty(notificationEvent.ResponseElements["x-minio-deployment-id"]);
+        Assert.Equal($"http://{minioContainer.IpAddress}:9000", notificationEvent.ResponseElements["x-minio-origin-endpoint"]);
+        Assert.Equal("1.0", notificationEvent.S3.SchemaVersion);
+        Assert.Equal("Config", notificationEvent.S3.ConfigurationId);
+        Assert.Equal(bucketName, notificationEvent.S3.Bucket.Name);
+        Assert.Equal(minioContainer.GetAccessKey(), notificationEvent.S3.Bucket.OwnerIdentity.PrincipalId);
+        Assert.Equal($"arn:aws:s3:::{bucketName}", notificationEvent.S3.Bucket.Arn);
+        Assert.Equal(key, notificationEvent.S3.Object.Key);
+        Assert.Equal((ulong)testData.Length, notificationEvent.S3.Object.Size);
+        Assert.Equal("3e25960a79dbc69b674cd4ec67a72c62", notificationEvent.S3.Object.Etag);
+        Assert.Equal(contentType, notificationEvent.S3.Object.ContentType);
+        Assert.Equal(contentType, notificationEvent.S3.Object.UserMetadata["content-type"]);
+        Assert.NotEmpty(notificationEvent.S3.Object.Sequencer);
+        Assert.True(IPAddress.TryParse(notificationEvent.Source.Host, out _));
     }
 }

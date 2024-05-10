@@ -25,5 +25,5 @@ public interface IMinioClient
     
     Task<BucketNotification> GetBucketNotificationsAsync(string bucketName, CancellationToken cancellationToken = default);
     Task SetBucketNotificationsAsync(string bucketName, BucketNotification bucketNotification, CancellationToken cancellationToken = default);
-    Task<IAsyncEnumerable<BucketNotificationEvent>> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix = "", string suffix = "", CancellationToken cancellationToken = default);
+    IAsyncEnumerable<NotificationEvent> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix = "", string suffix = "", CancellationToken cancellationToken = default);
 }

@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -629,7 +630,7 @@ internal class MinioClient : IMinioClient
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<IAsyncEnumerable<BucketNotificationEvent>> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix, string suffix, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<NotificationEvent> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix, string suffix, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
         if (events == null) throw new System.ArgumentNullException(nameof(events));
@@ -646,24 +647,23 @@ internal class MinioClient : IMinioClient
 
         using var req = CreateRequest(HttpMethod.Get, bucketName, query);
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
-        return ListenAsync(cancellationToken);
 
-        async IAsyncEnumerable<BucketNotificationEvent> ListenAsync([EnumeratorCancellation] CancellationToken ct)
+        var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (responseBody.ConfigureAwait(false))
         {
-            var responseBody = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            await using (responseBody.ConfigureAwait(false))
+            using var sr = new StreamReader(responseBody);
+            while (!sr.EndOfStream)
             {
-                using var sr = new StreamReader(responseBody);
-                while (!sr.EndOfStream)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var line = await sr.ReadLineAsync().ConfigureAwait(false);
-                    if (string.IsNullOrEmpty(line))
-                        break;
+                cancellationToken.ThrowIfCancellationRequested();
+                var line = await sr.ReadLineAsync().ConfigureAwait(false);
+                if (string.IsNullOrEmpty(line))
+                    break;
 
-                    var bucketNotificationEvent = JsonSerializer.Deserialize<BucketNotificationEvent>(line);
-                    if (bucketNotificationEvent != null)
-                        yield return bucketNotificationEvent;
+                var bucketNotificationEvent = JsonSerializer.Deserialize<BucketNotificationEvent>(line);
+                if (bucketNotificationEvent != null)
+                {
+                    foreach (var e in bucketNotificationEvent.Records)
+                        yield return e;
                 }
             }
         }
@@ -687,7 +687,7 @@ internal class MinioClient : IMinioClient
         await _requestAuthenticator.AuthenticateAsync(req, _options.Value.Region, "s3", cancellationToken).ConfigureAwait(false);
 
         using var httpClient = _httpClientFactory.CreateClient(_options.Value.MinioHttpClient);
-        var resp = await httpClient.SendAsync(req, cancellationToken).ConfigureAwait(false);
+        var resp = await httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var xmlData = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
