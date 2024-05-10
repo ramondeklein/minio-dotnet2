@@ -411,6 +411,12 @@ internal class MinioClient : IMinioClient
         var resp = await GetOrHeadObjectAsync(HttpMethod.Get, bucketName, key, options, cancellationToken).ConfigureAwait(false);
         var stream = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         var objectInfo = ToObjectInfo(key, resp);
+#pragma warning disable CA2000  
+        // The inner stream is owned by ContentLengthStream and the latter
+        // is returned, so there is no need to dispose anything at this point
+        if (objectInfo.ContentLength.HasValue)
+            stream = new ContentLengthStream(stream, objectInfo.ContentLength.Value);
+#pragma warning restore CA2000
         return (stream, objectInfo);
     }
 
