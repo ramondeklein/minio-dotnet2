@@ -14,9 +14,25 @@ namespace Minio.Implementation;
 
 internal partial class V4RequestAuthenticator : IRequestAuthenticator
 {
+    private static readonly KeyOnlySort KeyOnlySorter = new();
     private readonly ICredentialsProvider _credentialsProvider;
     private readonly ITimeProvider _timeProvider;
     private readonly ILogger<V4RequestAuthenticator> _logger;
+
+    private class KeyOnlySort : IComparer<string>
+    {
+        public int Compare(string? x, string? y)
+        {
+            return string.Compare(Key(x), Key(y), StringComparison.Ordinal);
+        }
+
+        private static string Key(string? queryParam)
+        {
+            if (queryParam == null) return string.Empty;
+            var valueIndex = queryParam.IndexOf('=', StringComparison.Ordinal);
+            return valueIndex == -1 ? queryParam : queryParam[..valueIndex];
+        }
+    }
 
 #if !NET6_0
     [GeneratedRegex(@"\s\s+")]
@@ -70,7 +86,10 @@ internal partial class V4RequestAuthenticator : IRequestAuthenticator
             if (query[0] == '?')
                 query = query[1..];
             var queryItems = query.Split('&', StringSplitOptions.RemoveEmptyEntries);
-            canonicalQueryString = string.Join('&', queryItems.OrderBy(s => s));
+            // Canonical query string should be sorted on the key values, but
+            // if a key is specified more than once, then it should maintain
+            // the same order. Therefor, "OrderBy" should be "stable" (which it is)
+            canonicalQueryString = string.Join('&', queryItems.OrderBy(s => s, KeyOnlySorter));
         }
         
         // Determine canonical and signed headers

@@ -641,15 +641,20 @@ internal class MinioClient : IMinioClient
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
         if (events == null) throw new System.ArgumentNullException(nameof(events));
 
-        var eventText = string.Join(",", events);
-        if (string.IsNullOrEmpty(eventText))
-            throw new System.ArgumentException("No events specified", nameof(events));
-
         var query = new QueryParams();
         query.Add("ping", "10");
-        query.Add("events", eventText);
         query.AddIfNotNullOrEmpty("prefix", prefix);
         query.AddIfNotNullOrEmpty("suffix", suffix);
+
+        var hasEvents = false;
+        foreach (var e in events)
+        {
+            hasEvents = true;
+            query.Add("events", e.ToString());
+        }
+
+        if (!hasEvents)
+            throw new System.ArgumentException("No events specified", nameof(events));
 
         using var req = CreateRequest(HttpMethod.Get, bucketName, query);
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);

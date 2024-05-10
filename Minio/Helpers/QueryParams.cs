@@ -45,10 +45,10 @@ internal class QueryParams
         var sb = new StringBuilder();
         foreach (var (name, values) in _params)
         {
-            sb.Append(sb.Length == 0 ? "?" : "&");
             var encodedName = Uri.EscapeDataString(name);
             foreach (var value in values)
             {
+                sb.Append(sb.Length == 0 ? "?" : "&");
                 sb.Append(encodedName);
                 sb.Append('=');
                 if (!string.IsNullOrEmpty(value))
