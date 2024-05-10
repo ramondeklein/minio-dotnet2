@@ -671,7 +671,7 @@ internal class MinioClient : IMinioClient
                     break;
 
                 var bucketNotificationEvent = JsonSerializer.Deserialize<BucketNotificationEvent>(line);
-                if (bucketNotificationEvent != null)
+                if (bucketNotificationEvent?.Records != null)
                 {
                     foreach (var e in bucketNotificationEvent.Records)
                         yield return e;
