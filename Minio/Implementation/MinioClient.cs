@@ -65,42 +65,6 @@ internal class MinioClient : IMinioClient
         _logger = logger;
     }
 
-    public async IAsyncEnumerable<BucketInfo> ListBucketsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        using var req = CreateRequest(HttpMethod.Get, string.Empty);
-        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
-
-        var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
-
-        var buckets = xResponse.Root?.Element(Ns + "Buckets");
-        if (buckets != null)
-        {
-            foreach (var xContent in buckets.Elements(Ns + "Bucket"))
-            {
-                yield return new BucketInfo
-                {
-                    CreationDate = xContent.Element(Ns + "CreationDate")?.Value.ParseIsoTimestamp() ?? DateTimeOffset.UnixEpoch,
-                    Name = xContent.Element(Ns + "Name")?.Value ?? string.Empty,
-                };
-            }
-        }
-    }
-
-    public async Task<bool> HeadBucketAsync(string bucketName, CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var req = CreateRequest(HttpMethod.Head, bucketName);
-            await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
-            return true;
-        }
-        catch (MinioHttpException exc) when (exc.Response.StatusCode == HttpStatusCode.NotFound)
-        {
-            return false;
-        }
-    }
-
     public async Task<string> CreateBucketAsync(string bucketName, CreateBucketOptions? options, CancellationToken cancellationToken)
     {
         var region = options?.Region;
@@ -123,6 +87,114 @@ internal class MinioClient : IMinioClient
     public async Task DeleteBucketAsync(string bucketName, CancellationToken cancellationToken)
     {
         using var req = CreateRequest(HttpMethod.Delete, bucketName);
+        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> BucketExistsAsync(string bucketName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var req = CreateRequest(HttpMethod.Head, bucketName);
+            await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (MinioHttpException exc) when (exc.Response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+    }
+
+    public async IAsyncEnumerable<BucketInfo> ListBucketsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        using var req = CreateRequest(HttpMethod.Get, string.Empty);
+        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+
+        var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
+
+        var buckets = xResponse.Root?.Element(Ns + "Buckets");
+        if (buckets != null)
+        {
+            foreach (var xContent in buckets.Elements(Ns + "Bucket"))
+            {
+                yield return new BucketInfo
+                {
+                    CreationDate = xContent.Element(Ns + "CreationDate")?.Value.ParseIsoTimestamp() ?? DateTimeOffset.UnixEpoch,
+                    Name = xContent.Element(Ns + "Name")?.Value ?? string.Empty,
+                };
+            }
+        }
+    }
+
+    public async Task<IDictionary<string, string>?> GetBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+
+        var query = new QueryParams();
+        query.Add("tagging", string.Empty);
+
+        try
+        {
+            using var req = CreateRequest(HttpMethod.Get, bucketName, query);
+            var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+
+            var tags = new Dictionary<string, string>();
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
+
+                var xTags = xResponse.Root!.Element("TagSet")?.Elements("Tag");
+                if (xTags != null)
+                {
+                    foreach (var xTag in xTags)
+                    {
+                        var key = xTag.Element("Key")?.Value;
+                        if (!string.IsNullOrEmpty(key))
+                        {
+                            var value = xTag.Element("Value")?.Value ?? string.Empty;
+                            tags.Add(key, value);
+                        }
+                    }
+                }
+            }
+
+            return tags;
+        }
+        catch (MinioHttpException minioHttpException) when (minioHttpException.Error?.Code == "NoSuchTagSet")
+        {
+            // No tags set (different from an empty tag set)
+            return null;
+        }
+    }
+
+    public async Task SetBucketTaggingAsync(string bucketName, IEnumerable<KeyValuePair<string, string>> tags, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+
+        var query = new QueryParams();
+        query.Add("tagging", string.Empty);
+
+        var xTagSet = new XElement(Ns + "TagSet");
+        foreach (var (key, value) in tags)
+            xTagSet.Add(new XElement(Ns + "Tag",
+                new XElement(Ns + "Key", key),
+                new XElement(Ns + "Value", value)));
+
+        var xTagging = new XElement(Ns + "Tagging", xTagSet);
+        
+        using var req = CreateRequest(HttpMethod.Put, bucketName, xTagging, query);
+        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task DeleteBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+
+        var query = new QueryParams();
+        query.Add("tagging", string.Empty);
+        
+        using var req = CreateRequest(HttpMethod.Delete, bucketName, query);
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 

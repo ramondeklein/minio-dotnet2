@@ -9,7 +9,7 @@ public class BucketTests : MinioTest
     {
         var client = CreateClient();
         await client.CreateBucketAsync("test").ConfigureAwait(true);
-        var bucketExists = await client.HeadBucketAsync("test").ConfigureAwait(true);
+        var bucketExists = await client.BucketExistsAsync("test").ConfigureAwait(true);
         Assert.True(bucketExists);
     }
 
@@ -34,5 +34,38 @@ public class BucketTests : MinioTest
         Assert.InRange(buckets[0].CreationDate, startTimeUtc, endTimeUtc);
         Assert.InRange(buckets[1].CreationDate, startTimeUtc, endTimeUtc);
         Assert.True(buckets[0].CreationDate < buckets[1].CreationDate);
+    }
+
+    [Fact]
+    public async Task BucketTagging()
+    {
+        var client = CreateClient();
+        await client.CreateBucketAsync("test").ConfigureAwait(true);
+        var tags1 = await client.GetBucketTaggingAsync("test").ConfigureAwait(true);
+        Assert.Null(tags1);
+
+        var tags2 = new Dictionary<string, string>
+        {
+            { "tag1", "abc" },
+            { "tag2", "def" },
+        };
+        await client.SetBucketTaggingAsync("test", tags2).ConfigureAwait(true);
+
+        var tags3 = await client.GetBucketTaggingAsync("test").ConfigureAwait(true);
+        Assert.NotNull(tags3);
+        Assert.Equal(tags2, tags3);
+
+        await client.DeleteBucketTaggingAsync("test").ConfigureAwait(true);
+
+        var tags4 = await client.GetBucketTaggingAsync("test").ConfigureAwait(true);
+        Assert.Null(tags4);
+
+        // ReSharper disable once CollectionNeverUpdated.Local
+        var tags5 = new Dictionary<string, string>();
+        await client.SetBucketTaggingAsync("test", tags5).ConfigureAwait(true);
+
+        var tags6 = await client.GetBucketTaggingAsync("test").ConfigureAwait(true);
+        Assert.NotNull(tags6);
+        Assert.Empty(tags6);
     }
 }

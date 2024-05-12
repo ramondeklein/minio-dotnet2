@@ -6,10 +6,13 @@ namespace Minio;
 public interface IMinioClient
 {
     // Bucket operations
-    IAsyncEnumerable<BucketInfo> ListBucketsAsync(CancellationToken cancellationToken = default);
-    Task<bool> HeadBucketAsync(string bucketName, CancellationToken cancellationToken = default);
     Task<string> CreateBucketAsync(string bucketName, CreateBucketOptions? options = null, CancellationToken cancellationToken = default);
     Task DeleteBucketAsync(string bucketName, CancellationToken cancellationToken = default);
+    Task<bool> BucketExistsAsync(string bucketName, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<BucketInfo> ListBucketsAsync(CancellationToken cancellationToken = default);
+    public Task<IDictionary<string, string>?> GetBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default);
+    public Task SetBucketTaggingAsync(string bucketName, IEnumerable<KeyValuePair<string, string>> tags, CancellationToken cancellationToken = default);
+    public Task DeleteBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default);
     
     // Object operations
     Task<CreateMultipartUploadResult> CreateMultipartUploadAsync(string bucketName, string key, CreateMultipartUploadOptions? options = null, CancellationToken cancellationToken = default);
@@ -23,7 +26,11 @@ public interface IMinioClient
     IAsyncEnumerable<PartItem> ListPartsAsync(string bucketName, string key, string uploadId, int pageSize = 0, string? partNumberMarker = null, CancellationToken cancellationToken = default);
     IAsyncEnumerable<UploadItem> ListMultipartUploadsAsync(string bucketName, string? delimiter = null, string? encodingType = null, string? keyMarker = null, int pageSize = 0, string? prefix = null, string? uploadIdMarker = null, CancellationToken cancellationToken = default);
     
+    // Bucket notifications
     Task<BucketNotification> GetBucketNotificationsAsync(string bucketName, CancellationToken cancellationToken = default);
     Task SetBucketNotificationsAsync(string bucketName, BucketNotification bucketNotification, CancellationToken cancellationToken = default);
     IAsyncEnumerable<NotificationEvent> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix = "", string suffix = "", CancellationToken cancellationToken = default);
+    
+    // Policies
+    
 }

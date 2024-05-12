@@ -45,6 +45,23 @@ public class V4RequestAuthenticatorTests
         Assert.Equal("Credential=minioadmin/20240411/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=3c80a4a86d5c03a9978ff5f125b40fc75ed2fd27bf7c8ef26dec185b6ea63f44", req.Headers.Authorization.Parameter);
     }
 
+    [Fact]
+    public async Task ValidateAuthenticationWithEmptyQueryValue()
+    {
+        var query = new QueryParams();
+        query.Add("tagging", string.Empty);
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"http://localhost:9000/test{query}");
+        req.Headers.Add("X-Amz-Content-Sha256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        req.Headers.Add("X-Amz-Date", "20240411T153713Z");
+
+        await AuthenticateRequestAsync(req).ConfigureAwait(true);
+
+        Assert.NotNull(req.Headers.Authorization!.Scheme);
+        Assert.Equal("AWS4-HMAC-SHA256", req.Headers.Authorization.Scheme);
+        Assert.Equal("Credential=minioadmin/20240411/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=71b660a420c73e3b080c890af76dcf86019e09fa0a73a3b79526c8bf6ca340b7", req.Headers.Authorization.Parameter);
+    }
+
     private async Task AuthenticateRequestAsync(HttpRequestMessage req)
     {
         var credsProvider = new StaticCredentialsProvider(Options.Create(new StaticCredentialsOptions

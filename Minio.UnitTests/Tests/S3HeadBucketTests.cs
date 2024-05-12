@@ -25,7 +25,7 @@ public class S3HeadBucketUnitTests : MinioUnitTests
             resp.StatusCode = HttpStatusCode.OK;
         });
 
-        var bucketExists = await minioClient.HeadBucketAsync("testbucket").ConfigureAwait(true);
+        var bucketExists = await minioClient.BucketExistsAsync("testbucket").ConfigureAwait(true);
         
         // Check result
         Assert.True(bucketExists);
@@ -50,7 +50,7 @@ public class S3HeadBucketUnitTests : MinioUnitTests
             resp.StatusCode = HttpStatusCode.NotFound;
         });
 
-        var bucketExists = await minioClient.HeadBucketAsync("anotherbucket").ConfigureAwait(true);
+        var bucketExists = await minioClient.BucketExistsAsync("anotherbucket").ConfigureAwait(true);
         
         // Check result
         Assert.False(bucketExists);

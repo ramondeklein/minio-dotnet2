@@ -27,7 +27,7 @@ var minioClient = host.Services.GetRequiredService<IMinioClient>();
 
 // Create the test-bucket (if it doesn't exist)
 const string testBucket = "testbucket";
-var hasBucket = await minioClient.HeadBucketAsync(testBucket).ConfigureAwait(false);
+var hasBucket = await minioClient.BucketExistsAsync(testBucket).ConfigureAwait(false);
 if (!hasBucket)
     await minioClient.CreateBucketAsync(testBucket).ConfigureAwait(false);
 
