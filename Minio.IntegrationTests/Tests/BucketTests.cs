@@ -1,3 +1,4 @@
+using Minio.Model;
 using Xunit;
 
 namespace Minio.IntegrationTests.Tests;
@@ -67,5 +68,50 @@ public class BucketTests : MinioTest
         var tags6 = await client.GetBucketTaggingAsync("test").ConfigureAwait(true);
         Assert.NotNull(tags6);
         Assert.Empty(tags6);
+    }
+
+    [Fact]
+    public async Task BucketObjectWithoutLocking()
+    {
+        var client = CreateClient();
+        await client.CreateBucketAsync("test").ConfigureAwait(true);
+        var objLock = await client.GetObjectLockConfigurationAsync("test").ConfigureAwait(true);
+        Assert.False(objLock.Enabled);
+        Assert.Null(objLock.DefaultRetentionRule);
+    }
+    
+
+    [Fact]
+    public async Task BucketObjectLock()
+    {
+        var client = CreateClient();
+        await client.CreateBucketAsync("test", objectLocking: true).ConfigureAwait(true);
+        var objLock = await client.GetObjectLockConfigurationAsync("test").ConfigureAwait(true);
+        Assert.True(objLock.Enabled);
+        Assert.Null(objLock.DefaultRetentionRule);
+
+        // Enable object lock (governance, days)
+        await client.SetObjectLockConfigurationAsync("test", new RetentionRuleDays(RetentionMode.Governance, 100)).ConfigureAwait(true);
+        objLock = await client.GetObjectLockConfigurationAsync("test").ConfigureAwait(true);
+        Assert.True(objLock.Enabled);
+        Assert.IsType<RetentionRuleDays>(objLock.DefaultRetentionRule);
+        var ruleDays = (RetentionRuleDays)objLock.DefaultRetentionRule;
+        Assert.Equal(RetentionMode.Governance, ruleDays.Mode);
+        Assert.Equal(100, ruleDays.Days);
+ 
+        // Disable object lock
+        await client.SetObjectLockConfigurationAsync("test", null).ConfigureAwait(true);
+        objLock = await client.GetObjectLockConfigurationAsync("test").ConfigureAwait(true);
+        Assert.True(objLock.Enabled);
+        Assert.Null(objLock.DefaultRetentionRule);
+
+        // Enable object lock (compliance, days)
+        await client.SetObjectLockConfigurationAsync("test", new RetentionRuleYears(RetentionMode.Compliance, 3)).ConfigureAwait(true);
+        objLock = await client.GetObjectLockConfigurationAsync("test").ConfigureAwait(true);
+        Assert.True(objLock.Enabled);
+        Assert.IsType<RetentionRuleYears>(objLock.DefaultRetentionRule);
+        var ruleYears = (RetentionRuleYears)objLock.DefaultRetentionRule;
+        Assert.Equal(RetentionMode.Compliance, ruleYears.Mode);
+        Assert.Equal(3, ruleYears.Years);
     }
 }

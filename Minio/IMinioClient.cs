@@ -6,7 +6,7 @@ namespace Minio;
 public interface IMinioClient
 {
     // Bucket operations
-    Task<string> CreateBucketAsync(string bucketName, CreateBucketOptions? options = null, CancellationToken cancellationToken = default);
+    Task<string> CreateBucketAsync(string bucketName, bool objectLocking = false, string region = "", CancellationToken cancellationToken = default);
     Task DeleteBucketAsync(string bucketName, CancellationToken cancellationToken = default);
     Task<bool> BucketExistsAsync(string bucketName, CancellationToken cancellationToken = default);
     IAsyncEnumerable<BucketInfo> ListBucketsAsync(CancellationToken cancellationToken = default);
@@ -30,6 +30,10 @@ public interface IMinioClient
     Task<BucketNotification> GetBucketNotificationsAsync(string bucketName, CancellationToken cancellationToken = default);
     Task SetBucketNotificationsAsync(string bucketName, BucketNotification bucketNotification, CancellationToken cancellationToken = default);
     IAsyncEnumerable<NotificationEvent> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix = "", string suffix = "", CancellationToken cancellationToken = default);
+    
+    // Object locking
+    Task<ObjectLockConfiguration> GetObjectLockConfigurationAsync(string bucketName, CancellationToken cancellationToken = default);
+    Task SetObjectLockConfigurationAsync(string bucketName, RetentionRule? defaultRetentionRule, CancellationToken cancellationToken = default);
     
     // Policies
     

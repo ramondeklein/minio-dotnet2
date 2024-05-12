@@ -115,8 +115,8 @@ internal static class HttpHeadersExtensions
         var modeHeaderValue = mode switch
         {
             null => null,
-            RetentionMode.Compliance => "COMPLIANCE",
-            RetentionMode.Governance => "GOVERNANCE",
+            RetentionMode.Compliance => RetentionModeExtensions.Serialize(mode.Value),
+            RetentionMode.Governance => RetentionModeExtensions.Serialize(mode.Value),
             _ => throw new ArgumentException("Invalid object lock mode", nameof(mode))
         };
         req.Headers.AddIfNotNull("X-Amz-Object-Lock-Mode", modeHeaderValue);

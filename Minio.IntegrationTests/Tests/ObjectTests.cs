@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net.Http.Headers;
 using Minio.Model;
 using Xunit;
@@ -14,11 +13,7 @@ public class ObjectTests : MinioTest
     public async Task TestPutAndGetObject()
     {
         var client = CreateClient();
-        var createBucketOptions = new CreateBucketOptions
-        {
-            ObjectLocking = true,
-        };
-        await client.CreateBucketAsync(BucketName, createBucketOptions).ConfigureAwait(true);
+        await client.CreateBucketAsync(BucketName, objectLocking: true).ConfigureAwait(true);
         var testData = GetRandomData(1024);
 
         var putObjectOptions = new PutObjectOptions
@@ -64,11 +59,7 @@ public class ObjectTests : MinioTest
         const int parallelUploads = 100;
 
         var client = CreateClient();
-        var createBucketOptions = new CreateBucketOptions
-        {
-            ObjectLocking = true,
-        };
-        await client.CreateBucketAsync(BucketName, createBucketOptions).ConfigureAwait(true);
+        await client.CreateBucketAsync(BucketName, objectLocking: true).ConfigureAwait(true);
 
         // Write out 100 objects in parallel
         var buffer = new byte[objectSize];

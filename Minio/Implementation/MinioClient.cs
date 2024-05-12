@@ -65,10 +65,8 @@ internal class MinioClient : IMinioClient
         _logger = logger;
     }
 
-    public async Task<string> CreateBucketAsync(string bucketName, CreateBucketOptions? options, CancellationToken cancellationToken)
+    public async Task<string> CreateBucketAsync(string bucketName, bool objectLocking, string region, CancellationToken cancellationToken)
     {
-        var region = options?.Region;
-        
         var xml = new XElement(Ns + "CreateBucketConfiguration");
         if (!string.IsNullOrEmpty(region) && region != "us-east-1")
         {
@@ -77,7 +75,7 @@ internal class MinioClient : IMinioClient
         }
 
         using var req = CreateRequest(HttpMethod.Put, bucketName, xml);
-        if (options?.ObjectLocking ?? false)
+        if (objectLocking)
             req.Headers.Add("X-Amz-Bucket-Object-Lock-Enabled", "true");
 
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
@@ -750,6 +748,47 @@ internal class MinioClient : IMinioClient
                 }
             }
         }
+    }
+
+    public async Task<ObjectLockConfiguration> GetObjectLockConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        
+        var query = new QueryParams();
+        query.Add("object-lock", string.Empty);
+
+        using var req = CreateRequest(HttpMethod.Get, bucketName, query);
+        try
+        {
+            var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+
+            var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
+
+            return ObjectLockConfiguration.Deserialize(xResponse.Root!);
+        }
+        catch (MinioHttpException exc) when (exc.Error?.Code == "ObjectLockConfigurationNotFoundError")
+        {
+            return new ObjectLockConfiguration();
+        }
+    }
+
+    public async Task SetObjectLockConfigurationAsync(string bucketName, RetentionRule? defaultRetentionRule = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        
+        var query = new QueryParams();
+        query.Add("object-lock", string.Empty);
+
+        var config = new ObjectLockConfiguration
+        {
+            Enabled = true,
+            DefaultRetentionRule = defaultRetentionRule
+        };
+        var xml = config.Serialize();
+        
+        using var req = CreateRequest(HttpMethod.Put, bucketName, xml, query);
+        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<HttpResponseMessage> SendRequestAsync(HttpRequestMessage req, CancellationToken cancellationToken)
