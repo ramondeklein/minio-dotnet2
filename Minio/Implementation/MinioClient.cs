@@ -733,7 +733,11 @@ internal class MinioClient : IMinioClient
             while (!sr.EndOfStream)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+#if NET7_0_OR_GREATER
+                var line = await sr.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+#else
                 var line = await sr.ReadLineAsync().ConfigureAwait(false);
+#endif
                 if (string.IsNullOrEmpty(line))
                     break;
 
