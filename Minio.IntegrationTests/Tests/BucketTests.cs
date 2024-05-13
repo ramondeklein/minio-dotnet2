@@ -9,9 +9,16 @@ public class BucketTests : MinioTest
     public async Task MakeStandardBucket()
     {
         var client = CreateClient();
+        
+        // Create the bucket
         await client.CreateBucketAsync("test").ConfigureAwait(true);
         var bucketExists = await client.BucketExistsAsync("test").ConfigureAwait(true);
         Assert.True(bucketExists);
+
+        // Delete the bucket again
+        await client.DeleteBucketAsync("test").ConfigureAwait(true);
+        bucketExists = await client.BucketExistsAsync("test").ConfigureAwait(true);
+        Assert.False(bucketExists);
     }
 
     [Fact]
