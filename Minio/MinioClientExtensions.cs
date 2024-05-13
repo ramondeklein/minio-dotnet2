@@ -11,6 +11,12 @@ public static class MinioClientExtensions
         return client.SetBucketNotificationsAsync(bucketName, new BucketNotification(), cancellationToken);
     }
     
+    public static Task DeleteBucketTaggingAsync(this IMinioClient client, string bucketName, CancellationToken cancellationToken = default)
+    {
+        if (client == null) throw new ArgumentNullException(nameof(client));
+        return client.SetBucketTaggingAsync(bucketName, null, cancellationToken);
+    }
+    
     public static Task RemoveObjectLockConfigurationAsync(this IMinioClient client, string bucketName, CancellationToken cancellationToken = default)
     {
         if (client == null) throw new ArgumentNullException(nameof(client));

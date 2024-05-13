@@ -166,34 +166,31 @@ internal class MinioClient : IMinioClient
         }
     }
 
-    public async Task SetBucketTaggingAsync(string bucketName, IEnumerable<KeyValuePair<string, string>> tags, CancellationToken cancellationToken = default)
+    public async Task SetBucketTaggingAsync(string bucketName, IEnumerable<KeyValuePair<string, string>>? tags, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
 
         var query = new QueryParams();
         query.Add("tagging", string.Empty);
 
-        var xTagSet = new XElement(Ns + "TagSet");
-        foreach (var (key, value) in tags)
-            xTagSet.Add(new XElement(Ns + "Tag",
-                new XElement(Ns + "Key", key),
-                new XElement(Ns + "Value", value)));
+        if (tags != null)
+        {
+            var xTagSet = new XElement(Ns + "TagSet");
+            foreach (var (key, value) in tags)
+                xTagSet.Add(new XElement(Ns + "Tag",
+                    new XElement(Ns + "Key", key),
+                    new XElement(Ns + "Value", value)));
 
-        var xTagging = new XElement(Ns + "Tagging", xTagSet);
-        
-        using var req = CreateRequest(HttpMethod.Put, bucketName, xTagging, query);
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
-    }
+            var xTagging = new XElement(Ns + "Tagging", xTagSet);
 
-    public async Task DeleteBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
-
-        var query = new QueryParams();
-        query.Add("tagging", string.Empty);
-        
-        using var req = CreateRequest(HttpMethod.Delete, bucketName, query);
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            using var req = CreateRequest(HttpMethod.Put, bucketName, xTagging, query);
+            await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            using var req = CreateRequest(HttpMethod.Delete, bucketName, query);
+            await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public async Task<CreateMultipartUploadResult> CreateMultipartUploadAsync(string bucketName, string key, CreateMultipartUploadOptions? options, CancellationToken cancellationToken)
