@@ -197,7 +197,7 @@ public readonly struct EventType : IEquatable<EventType>
     public override string ToString() => _value;
     public static implicit operator string(EventType et) => et._value;
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         return obj is EventType other && 
                other._value.Equals(_value, StringComparison.Ordinal);
@@ -206,7 +206,7 @@ public readonly struct EventType : IEquatable<EventType>
     public bool Equals(EventType other) =>
         _value.Equals(other._value, StringComparison.Ordinal);
 
-    public override int GetHashCode() => _value.GetHashCode();
+    public override int GetHashCode() => _value.GetHashCode(StringComparison.Ordinal);
     public static bool operator ==(EventType left, EventType right) => left.Equals(right);
     public static bool operator !=(EventType left, EventType right) => !(left == right);
 }

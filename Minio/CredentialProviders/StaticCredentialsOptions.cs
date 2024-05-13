@@ -1,4 +1,4 @@
-namespace Minio;
+namespace Minio.CredentialProviders;
 
 public class StaticCredentialsOptions
 {

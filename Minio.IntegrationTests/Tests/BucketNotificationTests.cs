@@ -14,7 +14,7 @@ namespace Minio.IntegrationTests.Tests;
 
 public class BucketNotificationTests
 {
-    private class BucketNotificationEventDeserializer : INatsDeserialize<BucketNotificationEvent>
+    private sealed class BucketNotificationEventDeserializer : INatsDeserialize<BucketNotificationEvent>
     {
         public BucketNotificationEvent? Deserialize(in ReadOnlySequence<byte> buffer)
             => JsonSerializer.Deserialize<BucketNotificationEvent>(buffer.FirstSpan);

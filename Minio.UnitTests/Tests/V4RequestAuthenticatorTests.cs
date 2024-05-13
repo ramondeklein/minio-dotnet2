@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Minio.CredentialProviders;
 using Minio.Helpers;
 using Minio.Implementation;
 using Minio.Model;
@@ -62,7 +63,7 @@ public class V4RequestAuthenticatorTests
         Assert.Equal("Credential=minioadmin/20240411/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=71b660a420c73e3b080c890af76dcf86019e09fa0a73a3b79526c8bf6ca340b7", req.Headers.Authorization.Parameter);
     }
 
-    private async Task AuthenticateRequestAsync(HttpRequestMessage req)
+    private static async Task AuthenticateRequestAsync(HttpRequestMessage req)
     {
         var credsProvider = new StaticCredentialsProvider(Options.Create(new StaticCredentialsOptions
         {

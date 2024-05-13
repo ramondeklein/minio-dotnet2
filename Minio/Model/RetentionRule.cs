@@ -40,7 +40,7 @@ public class RetentionRuleDays : RetentionRule
             new XElement(Constants.S3Ns + "Mode", RetentionModeExtensions.Serialize(Mode)),
             new XElement(Constants.S3Ns + "Days", Days));
 
-    public static RetentionRuleDays Deserialize(XElement xElement)
+    public new static RetentionRuleDays Deserialize(XElement xElement)
     {
         if (xElement == null) throw new ArgumentNullException(nameof(xElement));
         var mode = RetentionModeExtensions.Deserialize(xElement.Element(Constants.S3Ns + "Mode")?.Value ?? string.Empty);
@@ -63,7 +63,7 @@ public class RetentionRuleYears : RetentionRule
             new XElement(Constants.S3Ns + "Mode", RetentionModeExtensions.Serialize(Mode)),
             new XElement(Constants.S3Ns + "Years", Years));
 
-    public static RetentionRuleYears Deserialize(XElement xElement)
+    public new static RetentionRuleYears Deserialize(XElement xElement)
     {
         if (xElement == null) throw new ArgumentNullException(nameof(xElement));
         var mode = RetentionModeExtensions.Deserialize(xElement.Element(Constants.S3Ns + "Mode")?.Value ?? string.Empty);

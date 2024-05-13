@@ -11,8 +11,7 @@ public interface IMinioClient
     Task<bool> BucketExistsAsync(string bucketName, CancellationToken cancellationToken = default);
     IAsyncEnumerable<BucketInfo> ListBucketsAsync(CancellationToken cancellationToken = default);
     public Task<IDictionary<string, string>?> GetBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default);
-    public Task SetBucketTaggingAsync(string bucketName, IEnumerable<KeyValuePair<string, string>> tags, CancellationToken cancellationToken = default);
-    public Task DeleteBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default);
+    public Task SetBucketTaggingAsync(string bucketName, IEnumerable<KeyValuePair<string, string>>? tags, CancellationToken cancellationToken = default);
     
     // Object operations
     Task<CreateMultipartUploadResult> CreateMultipartUploadAsync(string bucketName, string key, CreateMultipartUploadOptions? options = null, CancellationToken cancellationToken = default);
@@ -34,7 +33,4 @@ public interface IMinioClient
     // Object locking
     Task<ObjectLockConfiguration> GetObjectLockConfigurationAsync(string bucketName, CancellationToken cancellationToken = default);
     Task SetObjectLockConfigurationAsync(string bucketName, RetentionRule? defaultRetentionRule, CancellationToken cancellationToken = default);
-    
-    // Policies
-    
 }
