@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection.Extensions;
 using Minio;
+using Minio.CredentialProviders;
 using Minio.Implementation;
 
 // ReSharper disable once CheckNamespace
@@ -9,6 +10,7 @@ public interface IMinioBuilder
 {
     IMinioBuilder WithStaticCredentials(Action<StaticCredentialsOptions> configure);
     IMinioBuilder WithStaticCredentials(string accessKey, string secretKey, string? sessionToken = null);
+    IMinioBuilder WithEnvironmentCredentials();
 }
 
 public static class ServiceCollectionServiceExtensions
@@ -37,6 +39,12 @@ public static class ServiceCollectionServiceExtensions
                 opts.SecretKey = secretKey;
                 opts.SessionToken = sessionToken;
             });
+
+        public IMinioBuilder WithEnvironmentCredentials()
+        {
+            _serviceCollection.AddSingleton<ICredentialsProvider, EnvironmentCredentialsProvider>();
+            return this;
+        }
     }
     
     public static IMinioBuilder AddMinio(
@@ -46,7 +54,6 @@ public static class ServiceCollectionServiceExtensions
     {
         services.AddHttpClient("MinioClient").AddPolicyHandler(MinioClientBuilder.GetRetryPolicy());
         services.TryAddSingleton<ITimeProvider, DefaultTimeProvider>();
-        services.TryAddSingleton<ICredentialsProvider, StaticCredentialsProvider>();
         services.TryAdd(new ServiceDescriptor(typeof(IRequestAuthenticator), typeof(V4RequestAuthenticator), lifetime));
         services.TryAdd(new ServiceDescriptor(typeof(IMinioClient), typeof(MinioClient), lifetime));
         if (configure != null)

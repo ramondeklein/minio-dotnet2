@@ -66,6 +66,11 @@ public sealed class MinioClientBuilder
         });
         return WithCredentialsProvider(new StaticCredentialsProvider(credentialOptions));
     }
+
+    public MinioClientBuilder WithEnvironmentCredentials()
+    {
+        return WithCredentialsProvider(new EnvironmentCredentialsProvider());
+    }
     
     internal static AsyncRetryPolicy<HttpResponseMessage> GetRetryPolicy()
     {
