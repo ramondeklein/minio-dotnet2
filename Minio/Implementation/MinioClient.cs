@@ -792,6 +792,22 @@ internal class MinioClient : IMinioClient
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<InfoMessage> GetServerInfo(bool metrics = false, CancellationToken cancellationToken = default)
+    {
+        var query = new QueryParams();
+        if (metrics)
+            query.Add("metrics", "true");
+        
+        using var req = CreateRequest(HttpMethod.Get, "minio/admin/v3/info", query);
+        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+
+        var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var text = await new StreamReader(responseBody).ReadToEndAsync().ConfigureAwait(false);
+        responseBody = new MemoryStream(Encoding.UTF8.GetBytes(text)); 
+        var infoMessage = await JsonSerializer.DeserializeAsync<InfoMessage>(responseBody, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return infoMessage!;
+    }
+
     private async Task<HttpResponseMessage> SendRequestAsync(HttpRequestMessage req, CancellationToken cancellationToken)
     {
         if (req.Content != null)

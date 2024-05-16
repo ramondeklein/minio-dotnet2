@@ -33,4 +33,7 @@ public interface IMinioClient
     // Object locking
     Task<ObjectLockConfiguration> GetObjectLockConfigurationAsync(string bucketName, CancellationToken cancellationToken = default);
     Task SetObjectLockConfigurationAsync(string bucketName, RetentionRule? defaultRetentionRule, CancellationToken cancellationToken = default);
+    
+    // Minio specifics
+    Task<InfoMessage> GetServerInfo(bool metrics = false, CancellationToken cancellationToken = default);
 }
