@@ -238,7 +238,7 @@ internal class MinioClient : IMinioClient
         };
     }
 
-    public async Task<UploadPartResult> UploadPartAsync(string bucketName, string key, string uploadId, int partNumber, Stream stream, UploadPartOptions? options, CancellationToken cancellationToken)
+    public async Task<UploadPartResult> UploadPartAsync(string bucketName, string key, string uploadId, int partNumber, Stream stream, UploadPartOptions? options, ProgressHandler? progress, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
         ArgumentException.ThrowIfNullOrEmpty(key);
@@ -250,6 +250,9 @@ internal class MinioClient : IMinioClient
         query.Add("uploadId", uploadId);
         
         using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}", query);
+
+        if (progress != null)
+            stream = new ProgressReadStream(stream, progress);
 
         req.Content = new StreamContent(stream);
         req
@@ -335,115 +338,20 @@ internal class MinioClient : IMinioClient
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task PutObjectAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
+    public async Task PutObjectAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, ProgressHandler? progress, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(stream);
 
-        var disableMultipart = false;
-        //var disableMultipart = options?.DisableMultipart ?? false;
-        if (disableMultipart && !stream.CanSeek)
-            throw new System.ArgumentException("Stream length should be available with disable multipart upload", nameof(stream));
-    
         if (stream.Length > MaxMultipartPutObjectSize)
             throw new System.ArgumentOutOfRangeException(nameof(stream), stream.Length, "Stream length out of range");
     
-        if (IsGoogleEndpoint)
-            disableMultipart = true;
-        
-        var partSize = options?.PartSize ?? MinPartSize;
-    
-        // if (!stream.CanSeek)
-        // {
-        //     var concurrentStreamParts = options?.ConcurrentStreamParts ?? false;
-        //     var numThreads = options?.NumThreads ?? 0;
-        //     if (concurrentStreamParts && numThreads > 1)
-        //         await PutObjectMultipartStreamParallelAsync(bucketName, key, stream, options, cancellationToken).ConfigureAwait(false);
-        //     else
-        //         await PutObjectMultipartStreamNoLength(bucketName, key, stream, options, cancellationToken).ConfigureAwait(false);
-        // }
-        // else
-        // {
-        //     if (stream.Length < partSize)
-                await PutObjectCoreAsync(bucketName, key, stream, options, cancellationToken).ConfigureAwait(false);
-        //     else
-        //         await PutObjectMultipartStream(bucketName, key, stream, options, cancellationToken).ConfigureAwait(false);
-        // }
-    }
-    //
-    // private async Task PutObjectMultipartStreamParallelAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
-    // {
-    //     if (options?.SendContentMd5 ?? false)
-    //         options.UserMetadata["X-Amz-Checksum-Algorithm"] = "CRC32C";
-    //     
-    //     var (totalPartsCount, partSize, _) = OptimalPartInfo(-1, options?.PartSize ?? 0);
-    //     var uploadId = await NewUploadIdAsync(bucketName, key, options, cancellationToken).ConfigureAwait(false);
-    //
-    //     options?.UserMetadata.Remove("X-Amz-Checksum-Algorithm");
-    //
-    //     var crcBytes = new List<byte>(4 * totalPartsCount); // 32-bits per part
-    //     
-    //     try
-    //     {
-    //         var nBuffers = options?.NumThreads ?? 1;
-    //         using var all = MemoryPool<byte>.Shared.Rent(nBuffers * partSize);
-    //         var semaphore = new SemaphoreSlim(nBuffers);
-    //         var bufs = new Stack<Memory<byte>>(nBuffers);
-    //         for (var i = 0; i < nBuffers; ++i)
-    //             bufs.Push(all.Memory[(i * partSize) .. partSize]);
-    //
-    //         // Part number always starts with '1'.
-    //         for (var partNumber = 1; partNumber <= totalPartsCount; partNumber++)
-    //         {
-    //             await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-    //             var buf = bufs.Pop();
-    //             try
-    //             {
-    //                 var read = await stream.ReadAsync(buf, cancellationToken).ConfigureAwait(false);
-    //                 if (read != partSize)
-    //                     throw new InvalidOperationException($"Expected to read {partSize} bytes, got only {read} bytes", );
-    //
-    //                 using var req = CreateRequest(HttpMethod.Put, "TODO");
-    //
-    //                 if (!(options?.SendContentMd5 ?? false))
-    //                 {
-    //                     var cSum = Crc32.Hash(buf.Span);
-    //                     crcBytes.AddRange(cSum);
-    //                     req.Headers.Add("X-Amz-Checksum-CRC32c", Convert.ToBase64String(cSum));
-    //                 }
-    //
-    //                 string? md5base64 = null;
-    //                 if (options?.SendContentMd5 ?? false)
-    //                     md5base64 = Convert.ToBase64String(MD5.HashData(buf.Span));
-    //
-    //                 Task task = UploadPartAsync(bucketName, key, uploadId, buf.Span, partNumber, md5base64, read, options?.ServerSideEncryption ?? false, !(options?.DisableContentSha256 ?? false), customHeader, cancellationToken);
-    //                 task.ContinueWith()
-    //                 
-    //                 {
-    //                     
-    //                 }
-    //
-    //                 //var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
-    //             }
-    //             finally
-    //             {
-    //                 bufs.Push(buf);
-    //                 semaphore.Release();
-    //             }
-    //         }
-    //     }
-    //     catch
-    //     {
-    //         await AbortMultipartUploadAsync(bucketName, key, uploadId, cancellationToken).ConfigureAwait(false);
-    //         throw;
-    //     }
-    // }
-    //
-    private async Task PutObjectCoreAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, CancellationToken cancellationToken)
-    {
         using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}");
-    
+
+        if (progress != null)
+            stream = new ProgressReadStream(stream, progress);
+
         req.Content = new StreamContent(stream);
         req
             .SetIfMatchETag(options?.IfMatchETag)

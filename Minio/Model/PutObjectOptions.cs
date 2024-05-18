@@ -19,6 +19,5 @@ public class PutObjectOptions
     public DateTimeOffset? RetainUntilDate { get; set; }
     public string? StorageClass { get; set; }
     public string? WebsiteRedirectLocation { get; set; }
-    public long? PartSize { get; set; }
     public LegalHoldStatus? LegalHold { get; set; }
 }

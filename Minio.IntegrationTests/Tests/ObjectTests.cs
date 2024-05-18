@@ -140,12 +140,23 @@ public class ObjectTests : MinioTest
             var data = GetRandomData(partSize);
             using (var ms = new MemoryStream(data))
             {
+                long lastKnownPosition = -1;
+                void Progress(long position, long length)
+                {
+                    Assert.NotEqual(lastKnownPosition, position);
+                    Assert.Equal(data.Length, length);
+                    Assert.InRange(position, Math.Max(0, lastKnownPosition), length);
+                    lastKnownPosition = position;
+                }
+
                 var uploadOpts = new UploadPartOptions();
-                var partResult = await client.UploadPartAsync(BucketName, ObjectKey, createResult.UploadId, part+1, ms, uploadOpts, ct).ConfigureAwait(true);
+                var partResult = await client.UploadPartAsync(BucketName, ObjectKey, createResult.UploadId, part+1, ms, uploadOpts, Progress, ct).ConfigureAwait(true);
                 parts[part] = new PartInfo
                 {
                     Etag = partResult.Etag!
                 };
+                
+                Assert.Equal(data.Length, lastKnownPosition);
             }
         }).ConfigureAwait(true);
 
