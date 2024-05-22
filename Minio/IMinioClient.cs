@@ -23,7 +23,7 @@ public interface IMinioClient
     Task PutObjectAsync(string bucketName, string key, Stream stream, PutObjectOptions? options = null, ProgressHandler? progress = null, CancellationToken cancellationToken = default);
     Task<ObjectInfo> HeadObjectAsync(string bucketName, string key, GetObjectOptions? options = null, CancellationToken cancellationToken = default);
     Task<(Stream, ObjectInfo)> GetObjectAsync(string bucketName, string key, GetObjectOptions? options = null, CancellationToken cancellationToken = default);
-    IAsyncEnumerable<ObjectItem> ListObjectsAsync(string bucketName, string? continuationToken = null, string? delimiter = null, string? encodingType = null, bool includeMetadata = false, string? fetchOwner = null, int pageSize = 0, string? prefix = null, string? startAfter = null, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<ObjectItem> ListObjectsAsync(string bucketName, string? continuationToken = null, string? delimiter = null, bool includeMetadata = false, string? fetchOwner = null, int pageSize = 0, string? prefix = null, string? startAfter = null, CancellationToken cancellationToken = default);
     IAsyncEnumerable<PartItem> ListPartsAsync(string bucketName, string key, string uploadId, int pageSize = 0, string? partNumberMarker = null, CancellationToken cancellationToken = default);
     IAsyncEnumerable<UploadItem> ListMultipartUploadsAsync(string bucketName, string? delimiter = null, string? encodingType = null, string? keyMarker = null, int pageSize = 0, string? prefix = null, string? uploadIdMarker = null, CancellationToken cancellationToken = default);
     

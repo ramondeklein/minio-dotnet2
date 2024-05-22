@@ -201,7 +201,7 @@ internal class MinioClient : IMinioClient
         var query = new QueryParams();
         query.Add("uploads", string.Empty);
         
-        using var req = CreateRequest(HttpMethod.Post, $"{bucketName}/{key}", query);
+        using var req = CreateRequest(HttpMethod.Post, Encode(bucketName, key), query);
 
         req
             .SetContentType(options?.ContentType)
@@ -249,7 +249,7 @@ internal class MinioClient : IMinioClient
         query.Add("partNumber", partNumber.ToString(CultureInfo.InvariantCulture));
         query.Add("uploadId", uploadId);
         
-        using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}", query);
+        using var req = CreateRequest(HttpMethod.Put, Encode(bucketName, key), query);
 
         if (progress != null)
             stream = new ProgressReadStream(stream, progress);
@@ -306,7 +306,7 @@ internal class MinioClient : IMinioClient
             xml.Add(xPart);
         }
 
-        using var req = CreateRequest(HttpMethod.Post, $"{bucketName}/{key}", xml, query);
+        using var req = CreateRequest(HttpMethod.Post, Encode(bucketName, key), xml, query);
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -334,7 +334,7 @@ internal class MinioClient : IMinioClient
         var query = new QueryParams();
         query.Add("uploadId", uploadId);
 
-        using var req = CreateRequest(HttpMethod.Delete, $"{bucketName}/{key}", query);
+        using var req = CreateRequest(HttpMethod.Delete, Encode(bucketName, key), query);
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
@@ -347,7 +347,7 @@ internal class MinioClient : IMinioClient
         if (stream.Length > MaxMultipartPutObjectSize)
             throw new System.ArgumentOutOfRangeException(nameof(stream), stream.Length, "Stream length out of range");
     
-        using var req = CreateRequest(HttpMethod.Put, $"{bucketName}/{key}");
+        using var req = CreateRequest(HttpMethod.Put, Encode(bucketName, key));
 
         if (progress != null)
             stream = new ProgressReadStream(stream, progress);
@@ -404,7 +404,7 @@ internal class MinioClient : IMinioClient
         q.AddIfNotNullOrEmpty("versionId", options?.VersionId);
         if (options?.PartNumber != null)
             q.AddIfNotNullOrEmpty("partNumber", options.PartNumber.Value.ToString(CultureInfo.InvariantCulture));
-        using var req = CreateRequest(httpMethod, $"{bucketName}/{key}", q);
+        using var req = CreateRequest(httpMethod, Encode(bucketName, key), q);
 
         options?.ServerSideEncryption?.WriteHeaders(req.Headers);
         if (options?.CheckSum ?? false)
@@ -437,7 +437,7 @@ internal class MinioClient : IMinioClient
         return await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async IAsyncEnumerable<ObjectItem> ListObjectsAsync(string bucketName, string? continuationToken, string? delimiter, string? encodingType, bool includeMetadata, string? fetchOwner, int pageSize, string? prefix, string? startAfter, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<ObjectItem> ListObjectsAsync(string bucketName, string? continuationToken, string? delimiter, bool includeMetadata, string? fetchOwner, int pageSize, string? prefix, string? startAfter, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
 
@@ -445,9 +445,9 @@ internal class MinioClient : IMinioClient
         {
             var q = new QueryParams();
             q.Add("list-type", "2");
+            q.Add("encoding-type", "url");
             q.AddIfNotNullOrEmpty("continuation-token", continuationToken);
             q.AddIfNotNullOrEmpty("delimiter", delimiter);
-            q.AddIfNotNullOrEmpty("encoding-type", encodingType);
             if (includeMetadata)
                 q.Add("metadata", "true");
             q.AddIfNotNullOrEmpty("fetch-owner", fetchOwner);
@@ -485,7 +485,7 @@ internal class MinioClient : IMinioClient
 
                 var objItem = new ObjectItem
                 {
-                    Key = xContent.Element(Ns + "Key")?.Value ?? string.Empty,
+                    Key = Uri.UnescapeDataString(xContent.Element(Ns + "Key")?.Value ?? string.Empty),
                     ETag = xContent.Element(Ns + "ETag")?.Value ?? string.Empty,
                     Size = long.TryParse(xContent.Element(Ns + "Size")?.Value, out var size) ? size : -1,
                     StorageClass = xContent.Element(Ns + "Key")?.Value ?? string.Empty,
@@ -515,7 +515,7 @@ internal class MinioClient : IMinioClient
                 q.Add("max-parts", pageSize.ToString(CultureInfo.InvariantCulture));
             q.AddIfNotNullOrEmpty("part-number-marker", partNumberMarker);
             q.AddIfNotNullOrEmpty("uploadId", uploadId);
-            using var req = CreateRequest(HttpMethod.Get, $"{bucketName}/{key}", q);
+            using var req = CreateRequest(HttpMethod.Get, Encode(bucketName, key), q);
 
             var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
@@ -542,6 +542,7 @@ internal class MinioClient : IMinioClient
             if (!isTruncated) break;
         }
     }
+
     public async IAsyncEnumerable<UploadItem> ListMultipartUploadsAsync(string bucketName, string? delimiter, string? encodingType, string? keyMarker, int pageSize, string? prefix, string? uploadIdMarker, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(bucketName);
@@ -783,6 +784,19 @@ internal class MinioClient : IMinioClient
         var req = CreateRequest(method, path, queryParameters);
         req.Content = new XmlHttpContent(new XDocument(xml));
         return req;
+    }
+
+    private static string Encode(string bucketName, string key)
+    {
+        var sb = new StringBuilder();
+        sb.Append(bucketName);
+        foreach (var keyPart in key.Split('/'))
+        {
+            sb.Append('/');
+            sb.Append(Uri.EscapeDataString(keyPart));
+        }
+
+        return sb.ToString();
     }
 
     private bool IsGoogleEndpoint => _options.Value.EndPoint.Host == "storage.googleapis.com";

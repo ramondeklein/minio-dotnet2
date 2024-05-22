@@ -53,7 +53,7 @@ public class ObjectTests : MinioTest
     }
 
     [Fact]
-    public async Task TestListObjects()
+    public async Task TestListObjects1()
     {
         const int objectSize = 256;
         const int parallelUploads = 100;
@@ -104,7 +104,7 @@ public class ObjectTests : MinioTest
 
         // List all objects starting with "test-" in the test-bucket
         // (max 10 objects at a time)
-        await foreach (var objItem in client.ListObjectsAsync(BucketName, prefix: "test-", delimiter: "/", includeMetadata: true, pageSize: 10, encodingType: "url"))
+        await foreach (var objItem in client.ListObjectsAsync(BucketName, prefix: "test-", delimiter: "/", includeMetadata: true, pageSize: 10))
         {
             Assert.StartsWith("test-", objItem.Key, StringComparison.Ordinal);
             if (!int.TryParse(objItem.Key[5..], out var i))
@@ -112,6 +112,44 @@ public class ObjectTests : MinioTest
             Assert.Equal(objectSize, objItem.Size);
             Assert.Equal("Minio-test", objItem.UserMetadata["FixedKey"]);
             Assert.Equal($"Value-{i}", objItem.UserMetadata["VariableKey"]);
+        }
+    }
+
+    [Fact]
+    public async Task TestListObjects2()
+    {
+        var prefixes = new[]
+        {
+            "prefix",
+            "字首",
+            "!@#$%^&*()",
+            "folder/prefix",
+            "資料夾/字首",
+            "!@#$%/^&*()",
+        };
+        
+        const int objectSize = 256;
+
+        var client = CreateClient();
+        await client.CreateBucketAsync(BucketName, objectLocking: true).ConfigureAwait(true);
+
+        var buffer = new byte[objectSize];
+        for (var i = 0; i < buffer.Length; ++i)
+            buffer[i] = (byte)i;
+
+        await Task.WhenAll(prefixes.Select(async prefix =>
+        {
+            var ms = new MemoryStream(buffer, false);
+            await using (ms.ConfigureAwait(false))
+            {
+                await client.PutObjectAsync(BucketName, $"{prefix}-test", ms).ConfigureAwait(false);
+            }
+        })).ConfigureAwait(true);
+
+        foreach (var prefix in prefixes)
+        {
+            await foreach (var objItem in client.ListObjectsAsync(BucketName, prefix: prefix, delimiter: "/")) 
+                Assert.Equal($"{prefix}-test", objItem.Key);
         }
     }
 
@@ -150,7 +188,7 @@ public class ObjectTests : MinioTest
                 }
 
                 var uploadOpts = new UploadPartOptions();
-                var partResult = await client.UploadPartAsync(BucketName, ObjectKey, createResult.UploadId, part+1, ms, uploadOpts, Progress, ct).ConfigureAwait(true);
+                var partResult = await client.UploadPartAsync(BucketName, ObjectKey, createResult.UploadId, part+1, ms, uploadOpts, false, Progress, ct).ConfigureAwait(true);
                 parts[part] = new PartInfo
                 {
                     Etag = partResult.Etag!
