@@ -115,19 +115,20 @@ public class ObjectTests : MinioTest
         }
     }
 
-    [Fact]
-    public async Task TestListObjects2()
+    public static readonly IEnumerable<object[]> Prefixes = new[]
     {
-        var prefixes = new[]
-        {
-            "prefix",
-            "字首",
-            "!@#$%^&*()",
-            "folder/prefix",
-            "資料夾/字首",
-            "!@#$%/^&*()",
-        };
-        
+        new object[] { "prefix" },
+        new object[] { "字首" },
+        new object[] { "!@#$%^&*()" },
+        new object[] { "folder/prefix" },
+        new object[] { "資料夾/字首" },
+        new object[] { "!@#$%/^&*()" },
+    };
+
+    [Theory]
+    [MemberData(nameof(Prefixes))]
+    public async Task TestListObjects2(string prefix)
+    {
         const int objectSize = 256;
 
         var client = CreateClient();
@@ -137,20 +138,14 @@ public class ObjectTests : MinioTest
         for (var i = 0; i < buffer.Length; ++i)
             buffer[i] = (byte)i;
 
-        await Task.WhenAll(prefixes.Select(async prefix =>
+        var ms = new MemoryStream(buffer, false);
+        await using (ms.ConfigureAwait(false))
         {
-            var ms = new MemoryStream(buffer, false);
-            await using (ms.ConfigureAwait(false))
-            {
-                await client.PutObjectAsync(BucketName, $"{prefix}-test", ms).ConfigureAwait(false);
-            }
-        })).ConfigureAwait(true);
-
-        foreach (var prefix in prefixes)
-        {
-            await foreach (var objItem in client.ListObjectsAsync(BucketName, prefix: prefix, delimiter: "/")) 
-                Assert.Equal($"{prefix}-test", objItem.Key);
+            await client.PutObjectAsync(BucketName, $"{prefix}-test", ms).ConfigureAwait(true);
         }
+
+        await foreach (var objItem in client.ListObjectsAsync(BucketName, prefix: prefix, delimiter: "/")) 
+            Assert.Equal($"{prefix}-test", objItem.Key);
     }
 
     [Fact]
