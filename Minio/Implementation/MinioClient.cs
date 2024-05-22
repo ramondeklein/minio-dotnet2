@@ -67,6 +67,8 @@ internal class MinioClient : IMinioClient
 
     public async Task<string> CreateBucketAsync(string bucketName, bool objectLocking, string region, CancellationToken cancellationToken)
     {
+        VerifyBucketName(bucketName);
+        
         var xml = new XElement(Ns + "CreateBucketConfiguration");
         if (!string.IsNullOrEmpty(region) && region != "us-east-1")
         {
@@ -84,12 +86,16 @@ internal class MinioClient : IMinioClient
 
     public async Task DeleteBucketAsync(string bucketName, CancellationToken cancellationToken)
     {
+        VerifyBucketName(bucketName);
+        
         using var req = CreateRequest(HttpMethod.Delete, bucketName);
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<bool> BucketExistsAsync(string bucketName, CancellationToken cancellationToken)
     {
+        VerifyBucketName(bucketName);
+        
         try
         {
             using var req = CreateRequest(HttpMethod.Head, bucketName);
@@ -126,8 +132,8 @@ internal class MinioClient : IMinioClient
 
     public async Task<IDictionary<string, string>?> GetBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
-
+        VerifyBucketName(bucketName);
+        
         var query = new QueryParams();
         query.Add("tagging", string.Empty);
 
@@ -168,8 +174,8 @@ internal class MinioClient : IMinioClient
 
     public async Task SetBucketTaggingAsync(string bucketName, IEnumerable<KeyValuePair<string, string>>? tags, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
-
+        VerifyBucketName(bucketName);
+        
         var query = new QueryParams();
         query.Add("tagging", string.Empty);
 
@@ -195,7 +201,7 @@ internal class MinioClient : IMinioClient
 
     public async Task<CreateMultipartUploadResult> CreateMultipartUploadAsync(string bucketName, string key, CreateMultipartUploadOptions? options, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         ArgumentException.ThrowIfNullOrEmpty(key);
         
         var query = new QueryParams();
@@ -240,7 +246,7 @@ internal class MinioClient : IMinioClient
 
     public async Task<UploadPartResult> UploadPartAsync(string bucketName, string key, string uploadId, int partNumber, Stream stream, UploadPartOptions? options, ProgressHandler? progress, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentException.ThrowIfNullOrEmpty(uploadId);
         if (partNumber < 1) throw new ArgumentOutOfRangeException(nameof(partNumber), "Part numbers start at 1");
@@ -273,7 +279,7 @@ internal class MinioClient : IMinioClient
 
     public async Task<CompleteMultipartUploadResult> CompleteMultipartUploadAsync(string bucketName, string key, string uploadId, IEnumerable<PartInfo> parts, CompleteMultipartUploadOptions? options, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentException.ThrowIfNullOrEmpty(uploadId);
         
@@ -327,7 +333,7 @@ internal class MinioClient : IMinioClient
     
     public async Task AbortMultipartUploadAsync(string bucketName, string key, string uploadId, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentException.ThrowIfNullOrEmpty(uploadId);
 
@@ -340,7 +346,7 @@ internal class MinioClient : IMinioClient
 
     public async Task PutObjectAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, ProgressHandler? progress, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(stream);
 
@@ -397,7 +403,7 @@ internal class MinioClient : IMinioClient
 
     private async Task<HttpResponseMessage> GetOrHeadObjectAsync(HttpMethod httpMethod, string bucketName, string key, GetObjectOptions? options, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         ArgumentException.ThrowIfNullOrEmpty(key);
 
         var q = new QueryParams();
@@ -439,7 +445,7 @@ internal class MinioClient : IMinioClient
 
     public async IAsyncEnumerable<ObjectItem> ListObjectsAsync(string bucketName, string? continuationToken, string? delimiter, bool includeMetadata, string? fetchOwner, int pageSize, string? prefix, string? startAfter, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
 
         while (true)
         {
@@ -506,7 +512,7 @@ internal class MinioClient : IMinioClient
 
     public async IAsyncEnumerable<PartItem> ListPartsAsync(string bucketName, string key, string uploadId, int pageSize, string? partNumberMarker, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
 
         while (true)
         {
@@ -545,7 +551,7 @@ internal class MinioClient : IMinioClient
 
     public async IAsyncEnumerable<UploadItem> ListMultipartUploadsAsync(string bucketName, string? delimiter, string? encodingType, string? keyMarker, int pageSize, string? prefix, string? uploadIdMarker, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
 
         while (true)
         {
@@ -585,7 +591,7 @@ internal class MinioClient : IMinioClient
 
     public async Task<BucketNotification> GetBucketNotificationsAsync(string bucketName, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         
         var query = new QueryParams();
         query.Add("notification", string.Empty);
@@ -601,7 +607,7 @@ internal class MinioClient : IMinioClient
 
     public async Task SetBucketNotificationsAsync(string bucketName, BucketNotification bucketNotification, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         
         var query = new QueryParams();
         query.Add("notification", string.Empty);
@@ -614,7 +620,7 @@ internal class MinioClient : IMinioClient
 
     public async IAsyncEnumerable<NotificationEvent> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix, string suffix, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         if (events == null) throw new System.ArgumentNullException(nameof(events));
 
         var query = new QueryParams();
@@ -662,7 +668,7 @@ internal class MinioClient : IMinioClient
 
     public async Task<ObjectLockConfiguration> GetObjectLockConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         
         var query = new QueryParams();
         query.Add("object-lock", string.Empty);
@@ -685,7 +691,7 @@ internal class MinioClient : IMinioClient
 
     public async Task SetObjectLockConfigurationAsync(string bucketName, RetentionRule? defaultRetentionRule = null, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(bucketName);
+        VerifyBucketName(bucketName);
         
         var query = new QueryParams();
         query.Add("object-lock", string.Empty);
@@ -784,6 +790,13 @@ internal class MinioClient : IMinioClient
         var req = CreateRequest(method, path, queryParameters);
         req.Content = new XmlHttpContent(new XDocument(xml));
         return req;
+    }
+
+    private static void VerifyBucketName(string bucketName, [CallerArgumentExpression("bucketName")] string? paramName = null)
+    {
+        if (bucketName == null) throw new System.ArgumentNullException(paramName);
+        if (!VerificationHelpers.VerifyBucketName(bucketName))
+            throw new System.ArgumentException("Invalid bucket name", paramName);
     }
 
     private static string Encode(string bucketName, string key)
