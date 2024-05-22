@@ -66,5 +66,5 @@ await using (stream.ConfigureAwait(false))
 
 // List all objects starting with "test-" in the test-bucket
 // (max 20 objects at a time)
-await foreach (var objItem in minioClient.ListObjectsAsync(testBucket, prefix: "test-", delimiter: "/", pageSize: 20, encodingType: "url"))
+await foreach (var objItem in minioClient.ListObjectsAsync(testBucket, prefix: "test-", delimiter: "/", pageSize: 20))
     Console.WriteLine($"{objItem.Key,-40} {objItem.Size,10} bytes, etag: {objItem.ETag}");

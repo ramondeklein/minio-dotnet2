@@ -188,7 +188,7 @@ public class ObjectTests : MinioTest
                 }
 
                 var uploadOpts = new UploadPartOptions();
-                var partResult = await client.UploadPartAsync(BucketName, ObjectKey, createResult.UploadId, part+1, ms, uploadOpts, false, Progress, ct).ConfigureAwait(true);
+                var partResult = await client.UploadPartAsync(BucketName, ObjectKey, createResult.UploadId, part+1, ms, uploadOpts, Progress, ct).ConfigureAwait(true);
                 parts[part] = new PartInfo
                 {
                     Etag = partResult.Etag!
