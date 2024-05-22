@@ -2,7 +2,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -18,6 +17,9 @@ using Minio.Model.Notification;
 using ArgumentException = Shims.ArgumentException; 
 using ArgumentNullException = Shims.ArgumentNullException; 
 using SHA256 = Shims.SHA256; 
+using MD5 = Shims.MD5;
+#else
+using System.Security.Cryptography;
 #endif
 
 namespace Minio.Implementation;
@@ -401,6 +403,122 @@ internal class MinioClient : IMinioClient
         return (stream, objectInfo);
     }
 
+    public async Task DeleteObjectAsync(string bucketName, string key, string? versionId, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, CancellationToken cancellationToken)
+    {
+        VerifyBucketName(bucketName);
+        
+        var q = new QueryParams();
+        q.AddIfNotNullOrEmpty("versionId", versionId);
+
+        using var req = CreateRequest(HttpMethod.Delete, Encode(bucketName, key), q);
+        req.SetBypassGovernanceRetention(bypassGovernanceRetention)
+            .SetExpectedBucketOwner(expectedBucketOwner)
+            .SetMfa(mfa);
+        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task DeleteObjectsAsync(string bucketName, IEnumerable<KeyAndVersion> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, CancellationToken cancellationToken)
+    {
+        var deleteObjects = InternalDeleteObjectsAsync(bucketName, objects, bypassGovernanceRetention, expectedBucketOwner, mfa, true, cancellationToken);
+        await foreach (var _ in deleteObjects.ConfigureAwait(false))
+        {
+            // We should never receive any results in quiet mode
+        }
+    }
+    
+    public IAsyncEnumerable<DeleteResult> DeleteObjectsVerboseAsync(string bucketName, IEnumerable<KeyAndVersion> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, CancellationToken cancellationToken)
+    {
+        return InternalDeleteObjectsAsync(bucketName, objects, bypassGovernanceRetention, expectedBucketOwner, mfa, false, cancellationToken);
+    }
+    
+    private async IAsyncEnumerable<DeleteResult> InternalDeleteObjectsAsync(string bucketName, IEnumerable<KeyAndVersion> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, bool quiet, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        VerifyBucketName(bucketName);
+        ArgumentNullException.ThrowIfNull(objects);
+
+        var q = new QueryParams();
+        q.Add("delete", string.Empty);
+
+        // Ensure it's batched in max 1000 items
+        var itemsLeft = true;
+        using var enumerator = objects.GetEnumerator();
+        while (itemsLeft)
+        {
+            var xDelete = new XElement(Ns + "Delete");
+            if (quiet)
+                xDelete.Add(new XElement(Ns + "Quiet", true));
+
+            var items = 0;
+            while (items < 1000)
+            {
+                itemsLeft = enumerator.MoveNext();
+                if (!itemsLeft) break;
+                
+                var obj = enumerator.Current;
+                var xObject = new XElement(Ns + "Object", new XElement(Ns + "Key", obj.Key));
+                if (obj.VersionId != null)
+                    xObject.Add(Ns + "VersionId", obj.VersionId);
+                xDelete.Add(xObject);
+                ++items;
+            }
+
+            if (items > 0)
+            {
+                HttpResponseMessage resp;
+                using (var req = CreateRequest(HttpMethod.Post, bucketName, xDelete, q))
+                {
+                    // DeleteObjects requires a "Content-MD5" header
+                    // TODO: Do this more elegant to prevent repeating code later
+                    var stream = await req.Content!.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                    req.Content.Headers.ContentMD5 = await MD5.HashDataAsync(stream, cancellationToken).ConfigureAwait(false); 
+                    stream.Position = 0;
+
+                    req.SetBypassGovernanceRetention(bypassGovernanceRetention)
+                        .SetExpectedBucketOwner(expectedBucketOwner)
+                        .SetMfa(mfa);
+                    resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+                }
+                
+                if (!quiet)
+                {
+                    var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                    var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
+
+                    foreach (var xResult in xResponse.Root!.Elements().Where(x => x.Name.Namespace == Ns))
+                    {
+                        switch (xResult.Name.LocalName)
+                        {
+                            case "Deleted":
+                            {
+                                var key = xResult.Element(Ns + "Key")?.Value ?? string.Empty;
+                                var versionIdText = xResult.Element(Ns + "VersionId")?.Value;
+                                var versionId = !string.IsNullOrEmpty(versionIdText) ? versionIdText : null; 
+                                var deleteMarkerText = xResult.Element(Ns + "DeleteMarker")?.Value;
+                                var deleteMarker = deleteMarkerText != null ? bool.TryParse(deleteMarkerText, out var dm) ? (bool?)dm : null : null;
+                                var deleteMarkerVersionIdText = xResult.Element(Ns + "DeleteMarker")?.Value;
+                                var deleteMarkerVersionId = !string.IsNullOrEmpty(deleteMarkerVersionIdText) ? deleteMarkerVersionIdText : null;
+                                yield return new DeleteResult(key, versionId, deleteMarker, deleteMarkerVersionId);
+                                break;
+                            }
+                            case "Error":
+                            {
+                                var key = xResult.Element(Ns + "Key")?.Value ?? string.Empty;
+                                var versionIdText = xResult.Element(Ns + "VersionId")?.Value;
+                                var versionId = !string.IsNullOrEmpty(versionIdText) ? versionIdText : null; 
+                                var errorCodeText = xResult.Element(Ns + "Code")?.Value;
+                                var errorCode = !string.IsNullOrEmpty(errorCodeText) ? errorCodeText : null; 
+                                var errorMessageText = xResult.Element(Ns + "Message")?.Value;
+                                var errorMessage = !string.IsNullOrEmpty(errorMessageText) ? errorMessageText : null; 
+                                yield return new DeleteResult(key, versionId, ErrorCode: errorCode, ErrorMessage: errorMessage);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private async Task<HttpResponseMessage> GetOrHeadObjectAsync(HttpMethod httpMethod, string bucketName, string key, GetObjectOptions? options, CancellationToken cancellationToken)
     {
         VerifyBucketName(bucketName);
@@ -728,8 +846,8 @@ internal class MinioClient : IMinioClient
         if (req.Content != null)
         {
             var stream = await req.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            var hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
-            req.Headers.Add("X-Amz-Content-Sha256", hash.ToHexStringLowercase());
+            var hashSha256 = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+            req.Headers.Add("X-Amz-Content-Sha256", hashSha256.ToHexStringLowercase());
             stream.Position = 0;
         }
         else

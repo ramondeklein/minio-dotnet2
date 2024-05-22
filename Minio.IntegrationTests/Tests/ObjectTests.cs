@@ -164,11 +164,7 @@ public class ObjectTests : MinioTest
         var parts = new PartInfo[totalParts];
         var parallelOpts = new ParallelOptions { MaxDegreeOfParallelism = 4 };
         
-#if NET8_0_OR_GREATER
-        await Parallel.ForAsync(0, totalParts, parallelOpts, async (part, ct) =>
-#else
         await Parallel.ForEachAsync(Enumerable.Range(0, totalParts), parallelOpts, async (part, ct) =>
-#endif
         {
             var data = GetRandomData(partSize);
             using (var ms = new MemoryStream(data))
@@ -241,6 +237,83 @@ public class ObjectTests : MinioTest
         // We should have 0 uploads
         var uploads2 = await client.ListMultipartUploadsAsync(BucketName).ToListAsync().ConfigureAwait(true);
         Assert.Empty(uploads2);
+    }
+
+    [Fact]
+    public async Task TestDeleteObjectSimple()
+    {
+        var client = CreateClient();
+        await client.CreateBucketAsync(BucketName).ConfigureAwait(true);
+        using var ms = new MemoryStream(new byte[1024]);
+        await client.PutObjectAsync(BucketName, ObjectKey, ms).ConfigureAwait(true);
+        await client.DeleteObjectAsync(BucketName, ObjectKey).ConfigureAwait(true);
+    }
+
+    [Fact]
+    public async Task TestDeleteObjectLotsOfFiles()
+    {
+        const int successFiles = 1015;  // Should be >1000 to batch deletes
+        const int failedFiles = 10;
+        
+        var client = CreateClient();
+        await client.CreateBucketAsync(BucketName).ConfigureAwait(true);
+        var data = new byte[1024];
+        await Parallel.ForEachAsync(Enumerable.Range(0, successFiles), async (i, ct) =>
+        {
+            using var ms = new MemoryStream(data, false);
+            await client.PutObjectAsync(BucketName, $"{ObjectKey}-{i:D04}", ms, cancellationToken: ct).ConfigureAwait(false);
+        }).ConfigureAwait(true);
+
+        var keys = Enumerable.Range(0, successFiles).Select(i => new KeyAndVersion($"{ObjectKey}-{i:D04}"));
+        var failedKeys = Enumerable.Range(0, failedFiles).Select(i => new KeyAndVersion($"NonExistent-{i:D304}"));
+        var combinedKeys = keys.Concat(failedKeys);
+        var failedKeySet = new HashSet<string>();
+        var successKeySet = new HashSet<string>();
+        await foreach (var result in client.DeleteObjectsVerboseAsync(BucketName, combinedKeys).ConfigureAwait(true))
+        {
+            if (result.ErrorCode != null)
+            {
+                Assert.StartsWith("NonExistent-", result.Key, StringComparison.Ordinal);
+                Assert.True(failedKeySet.Add(result.Key));
+                Assert.Null(result.VersionId);
+                Assert.NotNull(result.ErrorCode);
+                Assert.NotNull(result.ErrorMessage);
+            }
+            else
+            {
+                Assert.StartsWith($"{ObjectKey}-", result.Key, StringComparison.Ordinal);
+                Assert.True(successKeySet.Add(result.Key));
+                Assert.Null(result.VersionId);
+                Assert.Null(result.DeleteMarker);
+                Assert.Null(result.DeleteMarkerVersionId);
+            }
+        }
+        Assert.Equal(successFiles, successKeySet.Count);
+        Assert.Equal(failedFiles, failedKeySet.Count);
+    }
+
+    [Fact]
+    public async Task TestDeleteObjectLotsOfFilesQuiet()
+    {
+        const int successFiles = 1015;  // Should be >1000 to batch deletes
+        const int failedFiles = 10;
+        
+        var client = CreateClient();
+        await client.CreateBucketAsync(BucketName).ConfigureAwait(true);
+        var data = new byte[1024];
+        await Parallel.ForEachAsync(Enumerable.Range(0, successFiles), async (i, ct) =>
+        {
+            using var ms = new MemoryStream(data, false);
+            await client.PutObjectAsync(BucketName, $"{ObjectKey}-{i:D04}", ms, cancellationToken: ct).ConfigureAwait(false);
+        }).ConfigureAwait(true);
+
+        var keys = Enumerable.Range(0, successFiles).Select(i => new KeyAndVersion($"{ObjectKey}-{i:D04}"));
+        var failedKeys = Enumerable.Range(0, failedFiles).Select(i => new KeyAndVersion($"NonExistent-{i:D304}"));
+        var combinedKeys = keys.Concat(failedKeys);
+        await client.DeleteObjectsAsync(BucketName, combinedKeys).ConfigureAwait(true);
+
+        var objectCount = await client.ListObjectsAsync(BucketName).CountAsync().ConfigureAwait(true);
+        Assert.Equal(0, objectCount);
     }
 
     private static byte[] GetRandomData(int length)

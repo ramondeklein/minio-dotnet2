@@ -73,6 +73,28 @@ internal static class SHA256
         return await hasher.ComputeHashAsync(stream, cancellationToken).ConfigureAwait(false);
     }
 }
+
+// ReSharper disable once InconsistentNaming
+internal static class MD5
+{
+    public static byte[] HashData(byte[] data)
+    {
+        using var hasher = System.Security.Cryptography.MD5.Create();
+        return hasher.ComputeHash(data);
+    }
+
+    public static byte[] HashData(Stream stream)
+    {
+        using var hasher = System.Security.Cryptography.MD5.Create();
+        return hasher.ComputeHash(stream);
+    }
+
+    public static async Task<byte[]> HashDataAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        using var hasher = System.Security.Cryptography.MD5.Create();
+        return await hasher.ComputeHashAsync(stream, cancellationToken).ConfigureAwait(false);
+    }
+}
 }
 
 #endif

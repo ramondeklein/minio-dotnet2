@@ -176,4 +176,25 @@ internal static class HttpHeadersExtensions
             req.Headers.Add("X-Amz-Meta-" + k, v);
         return req;
     }
+    
+    public static HttpRequestMessage SetMfa(this HttpRequestMessage req, string? mfa)
+    {
+        if (mfa != null)
+            req.Headers.Add("X-Amz-MFA", mfa);
+        return req;
+    }
+    
+    public static HttpRequestMessage SetBypassGovernanceRetention(this HttpRequestMessage req, bool bypassGovernanceRetention)
+    {
+        if (bypassGovernanceRetention)
+            req.Headers.Add("X-Amz-Bypass-Governance-Retention", "true");
+        return req;
+    }
+    
+    public static HttpRequestMessage SetExpectedBucketOwner(this HttpRequestMessage req, string? expectedBucketOwner)
+    {
+        if (expectedBucketOwner != null)
+            req.Headers.Add("X-Amz-Expected-Bucket-Owner", expectedBucketOwner);
+        return req;
+    }
 }
