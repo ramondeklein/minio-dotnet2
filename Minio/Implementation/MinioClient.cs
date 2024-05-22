@@ -835,8 +835,6 @@ internal class MinioClient : IMinioClient
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        var text = await new StreamReader(responseBody).ReadToEndAsync().ConfigureAwait(false);
-        responseBody = new MemoryStream(Encoding.UTF8.GetBytes(text)); 
         var infoMessage = await JsonSerializer.DeserializeAsync<InfoMessage>(responseBody, cancellationToken: cancellationToken).ConfigureAwait(false);
         return infoMessage!;
     }
