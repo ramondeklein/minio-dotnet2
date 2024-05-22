@@ -2,8 +2,14 @@ name: dotnet package
 
 on: [push]
 
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
 jobs:
   unittest:
+    name: Run unit tests
     runs-on: ubuntu-latest
     env:
       BUILD_CONFIG: 'Release'
@@ -19,15 +25,23 @@ jobs:
       - name: Run unit tests
         run: dotnet test Minio.UnitTests --configuration $BUILD_CONFIG --logger trx --results-directory "UnitTestResults"
 
-      - name: Upload unit test results
+      - name: Upload test results
         uses: actions/upload-artifact@v4
+        if: ${{ always() }}
         with:
           name: unit-tests
           path: UnitTestResults
-        # Use always() to always run this step to publish test results when there are test failures
+        
+      - name: Publish test report
+        uses: dorny/test-reporter@v1
         if: ${{ always() }}
+        with:
+          name: Unit test report
+          path: UnitTestResults/*.trx
+          reporter: dotnet-trx
 
   integrationtest:
+    name: Run integration tests
     runs-on: ubuntu-latest
     env:
       BUILD_CONFIG: 'Release'
@@ -43,15 +57,23 @@ jobs:
       - name: Run integration tests
         run: dotnet test Minio.IntegrationTests --configuration $BUILD_CONFIG --logger trx --results-directory "IntegrationTestResults"
 
-      - name: Upload integration test results
+      - name: Upload test results
         uses: actions/upload-artifact@v4
+        if: ${{ always() }}
         with:
           name: integration-tests
           path: IntegrationTestResults
-        # Use always() to always run this step to publish test results when there are test failures
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v1
         if: ${{ always() }}
+        with:
+          name: Integration test report
+          path: IntegrationTestResults/*.trx
+          reporter: dotnet-trx
 
   publish:
+    name: Publish package
     runs-on: ubuntu-latest
     if: github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v')
     needs: [unittest,integrationtest]
