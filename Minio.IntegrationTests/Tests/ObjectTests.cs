@@ -307,13 +307,56 @@ public class ObjectTests : MinioTest
             await client.PutObjectAsync(BucketName, $"{ObjectKey}-{i:D04}", ms, cancellationToken: ct).ConfigureAwait(false);
         }).ConfigureAwait(true);
 
+        using (var ms = new MemoryStream(data, false))
+        {
+            await client.PutObjectAsync(BucketName, $"{ObjectKey}-empty", ms).ConfigureAwait(true);
+        }
+
         var keys = Enumerable.Range(0, successFiles).Select(i => new KeyAndVersion($"{ObjectKey}-{i:D04}"));
         var failedKeys = Enumerable.Range(0, failedFiles).Select(i => new KeyAndVersion($"NonExistent-{i:D304}"));
         var combinedKeys = keys.Concat(failedKeys);
         await client.DeleteObjectsAsync(BucketName, combinedKeys).ConfigureAwait(true);
 
+        // Only the file with "-empty" suffix should be there
         var objectCount = await client.ListObjectsAsync(BucketName).CountAsync().ConfigureAwait(true);
-        Assert.Equal(0, objectCount);
+        Assert.Equal(1, objectCount);
+    }
+
+    [Fact]
+    public async Task TestDeleteBucketVersioning()
+    {
+        var client = CreateClient();
+        await client.CreateBucketAsync(BucketName).ConfigureAwait(true);
+
+        // Write without versioning
+        var data = new byte[1024];
+        using var ms1 = new MemoryStream(data, false);
+        await client.PutObjectAsync(BucketName, ObjectKey, ms1).ConfigureAwait(true);
+        var objInfo1 = await client.HeadObjectAsync(BucketName, ObjectKey).ConfigureAwait(true);
+        Assert.Null(objInfo1.VersionId);
+
+        // Enable versioning
+        await client.SetBucketVersioningAsync(BucketName, VersioningStatus.Enabled, true).ConfigureAwait(true);
+        
+        // Write with versioning
+        using var ms2 = new MemoryStream(data, false);
+        await client.PutObjectAsync(BucketName, ObjectKey, ms2).ConfigureAwait(true);
+        var objInfo2 = await client.HeadObjectAsync(BucketName, ObjectKey).ConfigureAwait(true);
+        Assert.NotNull(objInfo2.VersionId);
+        Assert.NotEqual(string.Empty, objInfo2.VersionId);
+
+        // Check versioning setting
+        var config1 = await client.GetBucketVersioningAsync(BucketName).ConfigureAwait(true);
+        Assert.Equal(VersioningStatus.Enabled, config1.Status);
+        Assert.True(config1.MfaDelete);
+
+        // Disable versioning
+        await client.SetBucketVersioningAsync(BucketName, VersioningStatus.Suspended).ConfigureAwait(true);
+
+        // Check versioning setting
+        var config2 = await client.GetBucketVersioningAsync(BucketName).ConfigureAwait(true);
+        Assert.Equal(VersioningStatus.Suspended, config2.Status);
+        Assert.False(config2.MfaDelete);
     }
 
     private static byte[] GetRandomData(int length)

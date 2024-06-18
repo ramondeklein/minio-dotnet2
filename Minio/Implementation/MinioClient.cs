@@ -816,7 +816,7 @@ internal class MinioClient : IMinioClient
 
         var config = new ObjectLockConfiguration
         {
-            Enabled = true,
+            Enabled = defaultRetentionRule != null,
             DefaultRetentionRule = defaultRetentionRule
         };
         var xml = config.Serialize();
@@ -824,7 +824,41 @@ internal class MinioClient : IMinioClient
         using var req = CreateRequest(HttpMethod.Put, bucketName, xml, query);
         await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
+    
+    public async Task<VersioningConfiguration> GetBucketVersioningAsync(string bucketName, CancellationToken cancellationToken)
+    {
+        VerifyBucketName(bucketName);
+        
+        var query = new QueryParams();
+        query.Add("versioning", string.Empty);
 
+        using var req = CreateRequest(HttpMethod.Get, bucketName, query);
+        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+
+        var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
+
+        return VersioningConfiguration.Deserialize(xResponse.Root!);
+    }
+
+    public async Task SetBucketVersioningAsync(string bucketName, VersioningStatus status, bool mfaDelete, CancellationToken cancellationToken)
+    {
+        VerifyBucketName(bucketName);
+
+        var config = new VersioningConfiguration
+        {
+            Status = status,
+            MfaDelete = mfaDelete,
+        };
+        var xml = config.Serialize();
+        
+        var query = new QueryParams();
+        query.Add("versioning", string.Empty);
+
+        using var req = CreateRequest(HttpMethod.Put, bucketName, xml, query);
+        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+    }
+    
     private async Task<HttpResponseMessage> SendRequestAsync(HttpRequestMessage req, CancellationToken cancellationToken)
     {
         if (req.Content != null)

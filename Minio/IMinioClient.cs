@@ -39,4 +39,35 @@ public interface IMinioClient
     Task<ObjectLockConfiguration> GetObjectLockConfigurationAsync(string bucketName, CancellationToken cancellationToken = default);
     Task SetObjectLockConfigurationAsync(string bucketName, RetentionRule? defaultRetentionRule, CancellationToken cancellationToken = default);
     
+    Task<VersioningConfiguration> GetBucketVersioningAsync(string bucketName, CancellationToken cancellationToken = default);
+    Task SetBucketVersioningAsync(string bucketName, VersioningStatus status, bool mfaDelete = false, CancellationToken cancellationToken = default);
+
+    // TODO: Add following bucket operations
+    // SetBucketEncryptionAsync
+    // GetBucketEncryptionAsync
+    // RemoveBucketEncryptionAsync
+    // SetBucketLifecycleAsync
+    // GetBucketLifecycleAsync
+    // RemoveBucketLifecycleAsync
+    // GetBucketReplicationAsync
+    // SetBucketReplicationAsync
+    // RemoveBucketReplicationAsync
+    // GetPolicyAsync
+    // RemovePolicyAsync
+    // SetPolicyAsync
+
+    // TODO: Add following object operations
+    // GetObjectLegalHoldAsync
+    // SetObjectLegalHoldAsync
+    // SetObjectRetentionAsync
+    // GetObjectRetentionAsync
+    // ClearObjectRetentionAsync
+    // CopyObjectAsync
+    // SelectObjectContentAsync
+    // PresignedGetObjectAsync
+    // PresignedPostPolicyAsync
+    // PresignedPutObjectAsync
+    // GetObjectTagsAsync
+    // SetObjectTagsAsync
+    // RemoveObjectTagsAsync
 }
