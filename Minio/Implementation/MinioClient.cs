@@ -816,7 +816,6 @@ internal class MinioClient : IMinioClient
 
         var config = new ObjectLockConfiguration
         {
-            Enabled = defaultRetentionRule != null,
             DefaultRetentionRule = defaultRetentionRule
         };
         var xml = config.Serialize();
