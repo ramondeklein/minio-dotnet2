@@ -53,6 +53,21 @@ public class ObjectTests : MinioTest
     }
 
     [Fact]
+    public async Task TestPutZeroObject()
+    {
+        var client = CreateClient();
+        await client.CreateBucketAsync(BucketName, objectLocking: true).ConfigureAwait(true);
+        await client.PutObjectAsync(BucketName, ObjectKey, Stream.Null).ConfigureAwait(true);
+
+        var (data, _) = await client.GetObjectAsync(BucketName, ObjectKey).ConfigureAwait(true);
+        
+        await using (data.ConfigureAwait(true))
+        {
+            Assert.Equal(0, data.Length);
+        }
+    }
+
+    [Fact]
     public async Task TestListObjects1()
     {
         const int objectSize = 256;
