@@ -62,10 +62,10 @@ internal partial class V4RequestAuthenticator : IRequestAuthenticator
         ArgumentNullException.ThrowIfNull(request);
         
         var credentials = await _credentialsProvider.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
-        if (credentials == null) throw new InvalidOperationException("No credentials");
-        // TODO: Deal with session-token???
-        var authorization = CalculateAuthorization(credentials.Value, region, service, request);
+        var authorization = CalculateAuthorization(credentials, region, service, request);
         request.Headers.Authorization = new AuthenticationHeaderValue("AWS4-HMAC-SHA256", authorization);
+        if (!string.IsNullOrEmpty(credentials.SessionToken))
+            request.Headers.Add("X-Amz-Security-Token", credentials.SessionToken);
     }
 
     private string CalculateAuthorization(Credentials credentials, string region, string service, HttpRequestMessage request)
