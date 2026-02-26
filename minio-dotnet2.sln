@@ -9,6 +9,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution files", "Solution files", "{72C1F715-BD16-4F7F-9E52-111B815E7348}"
 	ProjectSection(SolutionItems) = preProject
 		Directory.Build.props = Directory.Build.props
+		DEVELOPMENT.md = DEVELOPMENT.md
 		CLAUDE.md = CLAUDE.md
 	EndProjectSection
 EndProject
