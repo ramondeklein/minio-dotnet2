@@ -3,6 +3,11 @@ using System.Security.Cryptography;
 
 namespace Minio.Model;
 
+/// <summary>
+/// Implements customer-provided server-side encryption (SSE-C) for S3 object operations.
+/// With SSE-C, the client supplies the AES-256 encryption key with every request; the key
+/// is never stored by the server.
+/// </summary>
 public class SSE : IServerSideEncryption
 {
     // SseGenericHeader is the AWS SSE header used for SSE-S3 and SSE-KMS.
@@ -19,9 +24,15 @@ public class SSE : IServerSideEncryption
     private const string SseCustomerKey = SseGenericHeader + "-Customer-Key";
     // SseCustomerKeyMD5 is the AWS SSE-C encryption key MD5 HTTP header key.
     private const string SseCustomerKeyMD5 = SseGenericHeader + "-Customer-Key-MD5";
-    
+
     private readonly byte[] _key;
 
+    /// <summary>
+    /// Initializes a new <see cref="SSE"/> instance with the specified 256-bit (32-byte) AES encryption key.
+    /// </summary>
+    /// <param name="key">A 32-byte AES-256 encryption key supplied by the caller. The key must be exactly 32 bytes.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="key"/> is not exactly 32 bytes in length.</exception>
     public SSE(byte[] key)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -29,9 +40,19 @@ public class SSE : IServerSideEncryption
 
         _key = key;
     }
-    
+
+    /// <summary>
+    /// Gets the encryption type identifier. Always returns <c>SSE-C</c> for customer-provided encryption.
+    /// </summary>
     public string Type => "SSE-C";
 
+    /// <summary>
+    /// Writes the SSE-C HTTP headers to the provided <see cref="HttpHeaders"/> collection.
+    /// Adds the customer algorithm (<c>AES256</c>), the Base64-encoded key, and the Base64-encoded
+    /// MD5 hash of the key, as required by the S3 SSE-C protocol.
+    /// </summary>
+    /// <param name="headers">The HTTP headers collection to which the SSE-C headers are added.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="headers"/> is <c>null</c>.</exception>
     public void WriteHeaders(HttpHeaders headers)
     {
         ArgumentNullException.ThrowIfNull(headers);

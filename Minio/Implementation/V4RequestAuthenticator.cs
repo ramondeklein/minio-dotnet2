@@ -13,6 +13,12 @@ using SHA256 = Shims.SHA256;
 
 namespace Minio.Implementation;
 
+/// <summary>
+/// Implements AWS Signature Version 4 (SigV4) request signing for MinIO and S3-compatible services.
+/// Signs outgoing <see cref="HttpRequestMessage"/> instances by computing a canonical request,
+/// a string-to-sign, and an HMAC-SHA256 signature, then attaching the resulting
+/// <c>AWS4-HMAC-SHA256</c> authorization header.
+/// </summary>
 public partial class V4RequestAuthenticator : IRequestAuthenticator
 {
     private static readonly KeyOnlySort KeyOnlySorter = new();
@@ -50,13 +56,29 @@ public partial class V4RequestAuthenticator : IRequestAuthenticator
     private static readonly Action<ILogger, string, Exception?> LogSignature =
         LoggerMessage.Define<string>(LogLevel.Trace, new EventId(id: 3, name: "SIGNATURE"), "Signature:\n{Signature}");
     
+    /// <summary>
+    /// Initializes a new instance of <see cref="V4RequestAuthenticator"/>.
+    /// </summary>
+    /// <param name="credentialsProvider">The provider used to obtain AWS credentials for signing.</param>
+    /// <param name="timeProvider">The time provider used to obtain the current UTC time for the signing date.</param>
+    /// <param name="logger">The logger used to emit trace-level diagnostic messages for canonical requests, strings-to-sign, and signatures.</param>
     public V4RequestAuthenticator(ICredentialsProvider credentialsProvider, ITimeProvider timeProvider, ILogger<V4RequestAuthenticator> logger)
     {
         _credentialsProvider = credentialsProvider;
         _timeProvider = timeProvider;
         _logger = logger;
     }
-    
+
+    /// <summary>
+    /// Authenticates the specified HTTP request by computing and attaching an AWS Signature Version 4
+    /// authorization header. If the credentials include a session token, the <c>X-Amz-Security-Token</c>
+    /// header is also added.
+    /// </summary>
+    /// <param name="request">The outgoing HTTP request message to authenticate.</param>
+    /// <param name="region">The AWS region identifier (e.g. <c>us-east-1</c>) used in the credential scope.</param>
+    /// <param name="service">The AWS service identifier (e.g. <c>s3</c>) used in the credential scope.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <returns>A <see cref="ValueTask"/> that represents the asynchronous authentication operation.</returns>
     public async ValueTask AuthenticateAsync(HttpRequestMessage request, string region, string service, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
