@@ -1,3 +1,4 @@
+using Minio.Helpers;
 using Minio.Model;
 using Minio.Model.Notification;
 
@@ -170,10 +171,10 @@ public interface IMinioClient
     /// <param name="options">Optional settings such as version ID, byte range, or conditional headers.</param>
     /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
     /// <returns>
-    /// A task that completes with a tuple of the object content <see cref="Stream"/> and
-    /// an <see cref="ObjectInfo"/> describing the object metadata.
+    /// A task that completes with a <see cref="ObjectInfoStream"/> that holds both the object's content
+    /// and an <see cref="ObjectInfo"/> describing the object metadata.
     /// </returns>
-    Task<(Stream, ObjectInfo)> GetObjectAsync(string bucketName, string key, GetObjectOptions? options = null, CancellationToken cancellationToken = default);
+    Task<ObjectInfoStream> GetObjectAsync(string bucketName, string key, GetObjectOptions? options = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes a single object (or a specific version of an object) from the specified bucket.

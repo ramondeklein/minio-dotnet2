@@ -54,11 +54,13 @@ public class WebIdentityProvider : ICredentialsProvider
     /// the temporary access key, secret key, session token, and expiration returned by STS.
     /// </returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the <see cref="IAccessTokenProvider"/> returns a null or empty access token.
+    /// Thrown when the <see cref="IAccessTokenProvider"/> returns a null or empty access token,
+    /// or when the STS success response does not contain a <c>Credentials</c> element.
     /// </exception>
     /// <exception cref="MinioHttpException">
     /// Thrown when the STS endpoint returns a non-success HTTP status code.
-    /// If the response body is XML, the error code and message from the XML payload are included.
+    /// If the response body is XML, the error code and message are extracted from the
+    /// <c>&lt;Error&gt;</c> child element of the STS error response.
     /// </exception>
     public async ValueTask<Credentials> GetCredentialsAsync(CancellationToken cancellationToken)
     {
@@ -91,17 +93,18 @@ public class WebIdentityProvider : ICredentialsProvider
                 var xRoot = XDocument.Parse(responseData).Root;
                 if (xRoot != null)
                 {
+                    var xError = xRoot.Element(Ns + "Error");
                     var err = new ErrorResponse
                     {
-                        Code = xRoot.Element("Code")?.Value ?? string.Empty,
-                        Message = xRoot.Element("Message")?.Value ?? string.Empty,
-                        BucketName = xRoot.Element("BucketName")?.Value ?? string.Empty,
-                        Key = xRoot.Element("Key")?.Value ?? string.Empty,
-                        Resource = xRoot.Element("Resource")?.Value ?? string.Empty,
-                        RequestId = xRoot.Element("RequestId")?.Value ?? string.Empty,
-                        HostId = xRoot.Element("HostId")?.Value ?? string.Empty,
-                        Region = xRoot.Element("Region")?.Value ?? string.Empty,
-                        Server = xRoot.Element("Server")?.Value ?? string.Empty,
+                        Code = xError?.Element(Ns + "Code")?.Value ?? string.Empty,
+                        Message = xError?.Element(Ns + "Message")?.Value ?? string.Empty,
+                        RequestId = xRoot.Element(Ns + "RequestId")?.Value ?? string.Empty,
+                        BucketName = string.Empty,
+                        Key = string.Empty,
+                        Resource = string.Empty,
+                        HostId = string.Empty,
+                        Region = string.Empty,
+                        Server = string.Empty,
                     };
                     throw new MinioHttpException(req, resp, err);
                 }
@@ -114,12 +117,14 @@ public class WebIdentityProvider : ICredentialsProvider
         var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
 
         var xCreds = xResponse.Root?.Element(Ns + "AssumeRoleWithWebIdentityResult")?.Element(Ns + "Credentials");
-        var exp = xCreds?.Element(Ns + "Expiration")?.Value;
+        if (xCreds == null)
+            throw new InvalidOperationException("STS response did not contain a Credentials element.");
+        var exp = xCreds.Element(Ns + "Expiration")?.Value;
         return new Credentials
         {
-            AccessKey = xCreds?.Element(Ns + "AccessKeyId")?.Value ?? string.Empty,
-            SecretKey = xCreds?.Element(Ns + "SecretAccessKey")?.Value ?? string.Empty,
-            SessionToken = xCreds?.Element(Ns + "SessionToken")?.Value ?? string.Empty,
+            AccessKey = xCreds.Element(Ns + "AccessKeyId")?.Value ?? string.Empty,
+            SecretKey = xCreds.Element(Ns + "SecretAccessKey")?.Value ?? string.Empty,
+            SessionToken = xCreds.Element(Ns + "SessionToken")?.Value ?? string.Empty,
             Expiration = exp != null ? DateTime.Parse(exp, null, DateTimeStyles.RoundtripKind) : null,
         };
     }

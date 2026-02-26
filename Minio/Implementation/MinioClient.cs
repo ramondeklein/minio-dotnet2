@@ -32,8 +32,8 @@ internal class MinioClient : IMinioClient
     private static readonly XNamespace Ns = Constants.S3Ns;
     
     private const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-    private static readonly Regex ExpirationRegex = new("expiry-date=\"(.*?)\", rule-id=\"(.*?)\"", RegexOptions.Compiled);
-    private static readonly Regex RestoreRegex = new("ongoing-request=\"(.*?)\"(, expiry-date=\"(.*?)\")?", RegexOptions.Compiled);
+    private static readonly Regex ExpirationRegex = new("expiry-date=\"(.*?)\", rule-id=\"(.*?)\"", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex RestoreRegex = new("ongoing-request=\"(.*?)\"(, expiry-date=\"(.*?)\")?", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly string[] PreserveKeys = new[]
     {
         "Content-Type",
@@ -392,18 +392,12 @@ internal class MinioClient : IMinioClient
         return ToObjectInfo(key, resp);
     }
 
-    public async Task<(Stream, ObjectInfo)> GetObjectAsync(string bucketName, string key, GetObjectOptions? options, CancellationToken cancellationToken)
+    public async Task<ObjectInfoStream> GetObjectAsync(string bucketName, string key, GetObjectOptions? options, CancellationToken cancellationToken)
     {
         var resp = await GetOrHeadObjectAsync(HttpMethod.Get, bucketName, key, options, cancellationToken).ConfigureAwait(false);
         var stream = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         var objectInfo = ToObjectInfo(key, resp);
-#pragma warning disable CA2000  
-        // The inner stream is owned by ContentLengthStream and the latter
-        // is returned, so there is no need to dispose anything at this point
-        if (objectInfo.ContentLength.HasValue)
-            stream = new ContentLengthStream(stream, objectInfo.ContentLength.Value);
-#pragma warning restore CA2000
-        return (stream, objectInfo);
+        return new ObjectInfoStream(stream, objectInfo, resp);
     }
 
     public async Task DeleteObjectAsync(string bucketName, string key, string? versionId, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, CancellationToken cancellationToken)
@@ -479,7 +473,9 @@ internal class MinioClient : IMinioClient
                     // DeleteObjects requires a "Content-MD5" header
                     // TODO: Do this more elegant to prevent repeating code later
                     var stream = await req.Content!.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                    req.Content.Headers.ContentMD5 = await MD5.HashDataAsync(stream, cancellationToken).ConfigureAwait(false); 
+                    if (!stream.CanSeek)
+                        throw new System.ArgumentException("Request content stream must be seekable for Content-MD5 computation.", nameof(req));
+                    req.Content.Headers.ContentMD5 = await MD5.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
                     stream.Position = 0;
 
                     req.SetBypassGovernanceRetention(bypassGovernanceRetention)
@@ -506,7 +502,7 @@ internal class MinioClient : IMinioClient
                                     var versionId = !string.IsNullOrEmpty(versionIdText) ? versionIdText : null;
                                     var deleteMarkerText = xResult.Element(Ns + "DeleteMarker")?.Value;
                                     var deleteMarker = deleteMarkerText != null ? bool.TryParse(deleteMarkerText, out var dm) ? (bool?)dm : null : null;
-                                    var deleteMarkerVersionIdText = xResult.Element(Ns + "DeleteMarker")?.Value;
+                                    var deleteMarkerVersionIdText = xResult.Element(Ns + "DeleteMarkerVersionId")?.Value;
                                     var deleteMarkerVersionId = !string.IsNullOrEmpty(deleteMarkerVersionIdText) ? deleteMarkerVersionIdText : null;
                                     yield return new DeleteResult(key, versionId, deleteMarker, deleteMarkerVersionId);
                                     break;
@@ -624,7 +620,7 @@ internal class MinioClient : IMinioClient
                     Key = Uri.UnescapeDataString(xContent.Element(Ns + "Key")?.Value ?? string.Empty),
                     ETag = xContent.Element(Ns + "ETag")?.Value ?? string.Empty,
                     Size = long.TryParse(xContent.Element(Ns + "Size")?.Value, out var size) ? size : -1,
-                    StorageClass = xContent.Element(Ns + "Key")?.Value ?? string.Empty,
+                    StorageClass = xContent.Element(Ns + "StorageClass")?.Value ?? string.Empty,
                     LastModified = xContent.Element(Ns + "LastModified")?.Value.ParseIsoTimestamp() ?? DateTimeOffset.MinValue,
                     ContentType = contentType,
                     Expires = expires,
@@ -787,7 +783,7 @@ internal class MinioClient : IMinioClient
                     var line = await sr.ReadLineAsync().ConfigureAwait(false);
 #endif
                     if (string.IsNullOrEmpty(line))
-                        break;
+                        continue;
 
                     var bucketNotificationEvent = JsonSerializer.Deserialize<BucketNotificationEvent>(line);
                     if (bucketNotificationEvent?.Records != null)
@@ -880,6 +876,8 @@ internal class MinioClient : IMinioClient
         if (req.Content != null)
         {
             var stream = await req.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            if (!stream.CanSeek)
+                throw new System.ArgumentException("Request content stream must be seekable for SHA-256 signing.", nameof(req));
             var hashSha256 = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
             req.Headers.Add("X-Amz-Content-Sha256", hashSha256.ToHexStringLowercase());
             stream.Position = 0;

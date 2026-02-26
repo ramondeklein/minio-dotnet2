@@ -3,29 +3,33 @@
 This guide covers setting up your development environment for the MinIO .NET SDK.
 
 ## Prerequisites: Installing the .NET SDK
+
 The SDK targets `net6.0` through `net10.0`. Install a recent .NET SDK (8.0 or later recommended).
 
 ### Windows
+
 Download and run the installer from [dotnet.microsoft.com/download](https://dotnet.microsoft.com/download), or use winget:
+
 ```bash
 winget install Microsoft.DotNet.SDK.10
 ```
 
 ### macOS
+
 ```bash
 brew install dotnet
 ```
 
 ### Linux (Debian/Ubuntu)
+
 ```bash
-wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
-sudo dpkg -i packages-microsoft-prod.deb
 sudo apt-get update && sudo apt-get install -y dotnet-sdk-10.0
 ```
 
 For other distributions see the [official install docs](https://learn.microsoft.com/dotnet/core/install/linux).
 
 ### Verify the installation
+
 ```bash
 dotnet --version
 ```
@@ -35,20 +39,12 @@ dotnet --version
 ## IDE Setup
 
 ### Visual Studio Code
+
 1. Install the [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit) extension (includes OmniSharp/Roslyn language server, test explorer, and debugger).
 2. Open the repository root folder — VS Code will detect `minio-dotnet2.sln` automatically.
 3. When prompted, select the solution file to activate IntelliSense across all projects.
 
-Useful workspace settings (`.vscode/settings.json`):
-
-```json
-{
-  "dotnet.defaultSolution": "minio-dotnet2.sln",
-  "editor.formatOnSave": true
-}
-```
-
-To run or debug an example directly, open the relevant `Program.cs` file and press **F5**, or use the **Run and Debug** panel and select **.NET Core Launch**.
+The repository already contains the settings to debug the example projects using VSCode.
 
 ### JetBrains Rider
 
@@ -57,11 +53,12 @@ To run or debug an example directly, open the relevant `Program.cs` file and pre
 3. The built-in test runner (under **View → Tool Windows → Unit Tests**) discovers xUnit tests without additional configuration.
 4. To run an example project, right-click it in the **Solution Explorer** and choose **Run** or **Debug**.
 
-No plugins are required. Rider ships with first-class .NET support out of the box.
+No plugins are required. Rider ships with first-class .NET support out of the box. Note that JetBrains Rider also provides a much better interface to debug individual or a set of tests.
 
 ---
 
 ## Example Projects
+
 Both examples connect to a local MinIO server. Start one with Docker before running them:
 
 ```bash

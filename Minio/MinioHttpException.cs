@@ -8,13 +8,16 @@ namespace Minio;
 
 /// <summary>
 /// Exception thrown when a MinIO or S3-compatible server returns an unsuccessful HTTP response.
-/// Provides access to the original <see cref="HttpRequestMessage"/>, the <see cref="HttpResponseMessage"/>,
+/// Provides a snapshot of the request method and URI, the <see cref="HttpResponseMessage"/>,
 /// and the parsed S3 <see cref="ErrorResponse"/> body (when available).
 /// </summary>
 public class MinioHttpException : MinioException
 {
     /// <summary>
-    /// Gets the HTTP request that triggered this exception.
+    /// Gets a snapshot of the HTTP request that triggered this exception, containing the
+    /// request method and URI. Only the <see cref="HttpRequestMessage.Method"/> and
+    /// <see cref="HttpRequestMessage.RequestUri"/> are guaranteed to be populated; headers
+    /// and content are not copied.
     /// </summary>
     public HttpRequestMessage Request { get; }
 
@@ -32,7 +35,9 @@ public class MinioHttpException : MinioException
     internal MinioHttpException(HttpRequestMessage request, HttpResponseMessage response, ErrorResponse? error)
         : base(GetMessage(request, response, error))
     {
-        Request = request;
+        // Clone method and URI so this exception remains usable after the request is disposed
+        // by its surrounding using-scope.
+        Request = new HttpRequestMessage(request.Method, request.RequestUri);
         Response = response;
         Error = error;
     }

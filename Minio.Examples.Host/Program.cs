@@ -57,7 +57,7 @@ await Task.WhenAll(Enumerable.Range(0, 100).Select(i => $"test-{i:D04}").Select(
 })).ConfigureAwait(false);
 
 // Read an object file
-var (stream, _) = await minioClient.GetObjectAsync(testBucket, "test-0000").ConfigureAwait(false);
+await using var stream = await minioClient.GetObjectAsync(testBucket, "test-0000").ConfigureAwait(false);
 await using (stream.ConfigureAwait(false))
 {
     // TODO: Do something with the stream

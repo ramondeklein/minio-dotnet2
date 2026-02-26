@@ -14,3 +14,5 @@ const string testBucket = "testbucket";
 var hasBucket = await minioClient.BucketExistsAsync(testBucket).ConfigureAwait(false);
 if (!hasBucket)
     await minioClient.CreateBucketAsync(testBucket).ConfigureAwait(false);
+
+Console.WriteLine($"Bucket '{testBucket}' is ready.");
