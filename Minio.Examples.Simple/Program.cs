@@ -1,4 +1,5 @@
 ﻿using Minio;
+using Minio.Model;
 
 // Ensure that Minio is running:
 //   docker run --rm -p 9000:9000 quay.io/minio/minio:latest server /data

@@ -40,7 +40,7 @@ public class ObjectTests : MinioTest
             await client.PutObjectAsync(BucketName, ObjectKey, msUpload, putObjectOptions).ConfigureAwait(true);
         }
 
-        var (data, objectInfo) = await client.GetObjectAsync(BucketName, ObjectKey).ConfigureAwait(true);
+        var (data, _) = await client.GetObjectAsync(BucketName, ObjectKey).ConfigureAwait(true);
         
         await using (data.ConfigureAwait(true))
         {
@@ -130,15 +130,15 @@ public class ObjectTests : MinioTest
         }
     }
 
-    public static readonly IEnumerable<object[]> Prefixes = new[]
-    {
-        new object[] { "prefix" },
-        new object[] { "字首" },
-        new object[] { "!@#$%^&*()" },
-        new object[] { "folder/prefix" },
-        new object[] { "資料夾/字首" },
-        new object[] { "!@#$%/^&*()" },
-    };
+    public static readonly IEnumerable<object[]> Prefixes =
+    [
+        ["prefix"],
+        ["字首"],
+        ["!@#$%^&*()"],
+        ["folder/prefix"],
+        ["資料夾/字首"],
+        ["!@#$%/^&*()"]
+    ];
 
     [Theory]
     [MemberData(nameof(Prefixes))]
@@ -226,7 +226,7 @@ public class ObjectTests : MinioTest
         Assert.Equal(BucketName, completeResult.Bucket);
         Assert.Equal(ObjectKey, completeResult.Key);
         
-        // Obtain the actual object
+        // Get the actual object
         var objectInfo = await client.HeadObjectAsync(BucketName, ObjectKey).ConfigureAwait(true);
         Assert.Equal(completeResult.Etag, objectInfo.Etag.Tag);
         Assert.Equal(totalParts * partSize, objectInfo.ContentLength);
@@ -238,10 +238,10 @@ public class ObjectTests : MinioTest
         var client = CreateClient();
         await client.CreateBucketAsync(BucketName).ConfigureAwait(true);
 
-        // Create multi-part upload
+        // Create multipart upload
         var abortUpload = await client.CreateMultipartUploadAsync(BucketName, ObjectKey).ConfigureAwait(true);
 
-        // We should have 1 uploads
+        // We should have 1 upload
         // IMPORTANT: In MinIO this call is only able to list when a prefix is set to an exact object-name
         var uploads1 = await client.ListMultipartUploadsAsync(BucketName, prefix: ObjectKey, pageSize: 10).ToListAsync().ConfigureAwait(true);
         Assert.Single(uploads1);
@@ -279,8 +279,12 @@ public class ObjectTests : MinioTest
             await client.PutObjectAsync(BucketName, $"{ObjectKey}-{i:D04}", ms, cancellationToken: ct).ConfigureAwait(false);
         }).ConfigureAwait(true);
 
-        var keys = Enumerable.Range(0, successFiles).Select(i => new KeyAndVersion($"{ObjectKey}-{i:D04}"));
-        var failedKeys = Enumerable.Range(0, failedFiles).Select(i => new KeyAndVersion($"NonExistent-{i:D304}"));
+        var keys = Enumerable.Range(0, successFiles).Select(i => new ObjectIdentifier{ Key = $"{ObjectKey}-{i:D04}" });
+        var failedKeys = Enumerable.Range(0, failedFiles).Select(i => new ObjectIdentifier
+        {
+            Key = $"InvalidETag-{i:D04}",
+            ETag = "invalid",
+        });
         var combinedKeys = keys.Concat(failedKeys);
         var failedKeySet = new HashSet<string>();
         var successKeySet = new HashSet<string>();
@@ -288,7 +292,7 @@ public class ObjectTests : MinioTest
         {
             if (result.ErrorCode != null)
             {
-                Assert.StartsWith("NonExistent-", result.Key, StringComparison.Ordinal);
+                Assert.StartsWith("InvalidETag-", result.Key, StringComparison.Ordinal);
                 Assert.True(failedKeySet.Add(result.Key));
                 Assert.Null(result.VersionId);
                 Assert.NotNull(result.ErrorCode);
@@ -327,8 +331,8 @@ public class ObjectTests : MinioTest
             await client.PutObjectAsync(BucketName, $"{ObjectKey}-empty", ms).ConfigureAwait(true);
         }
 
-        var keys = Enumerable.Range(0, successFiles).Select(i => new KeyAndVersion($"{ObjectKey}-{i:D04}"));
-        var failedKeys = Enumerable.Range(0, failedFiles).Select(i => new KeyAndVersion($"NonExistent-{i:D304}"));
+        var keys = Enumerable.Range(0, successFiles).Select(i => new ObjectIdentifier{Key = $"{ObjectKey}-{i:D04}"});
+        var failedKeys = Enumerable.Range(0, failedFiles).Select(i => new ObjectIdentifier{Key = $"NonExistent-{i:D304}"});
         var combinedKeys = keys.Concat(failedKeys);
         await client.DeleteObjectsAsync(BucketName, combinedKeys).ConfigureAwait(true);
 

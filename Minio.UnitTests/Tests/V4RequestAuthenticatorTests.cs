@@ -65,14 +65,14 @@ public class V4RequestAuthenticatorTests
 
     private static async Task AuthenticateRequestAsync(HttpRequestMessage req)
     {
-        var credsProvider = new StaticCredentialsProvider(Options.Create(new StaticCredentialsOptions
+        var credentialsProvider = new StaticCredentialsProvider(Options.Create(new StaticCredentialsOptions
         {
             AccessKey = "minioadmin",
             SecretKey = "minioadmin",
         }));
         var timeProvider = new StaticTimeProvider("20240411T153713Z");
         var logger = NullLoggerFactory.Instance.CreateLogger<V4RequestAuthenticator>();
-        var authenticator = new V4RequestAuthenticator(credsProvider, timeProvider, logger);
+        var authenticator = new V4RequestAuthenticator(credentialsProvider, timeProvider, logger);
         await authenticator.AuthenticateAsync(req, "us-east-1", "s3", default).ConfigureAwait(true);
     }
 }

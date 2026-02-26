@@ -11,9 +11,9 @@ public static class XmlHelpers
 
     public static bool DeepEqualsWithNormalization(XElement elt1, XElement elt2)
     {
-        if (elt1 == null) throw new ArgumentNullException(nameof(elt1));
-        if (elt2 == null) throw new ArgumentNullException(nameof(elt2));
-        
+        ArgumentNullException.ThrowIfNull(elt1);
+        ArgumentNullException.ThrowIfNull(elt2);
+
         var d1 = NormalizeElement(elt1);
         var d2 = NormalizeElement(elt2);
         return XNode.DeepEquals(d1, d2);

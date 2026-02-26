@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Minio.CredentialProviders;
@@ -16,8 +17,10 @@ public abstract class MinioUnitTests
     protected string CurrentTime { get; set; } = "20240411T153713Z";
     // ReSharper restore MemberCanBePrivate.Global
 
-    protected IMinioClient GetMinioClient(Action<HttpRequestMessage, HttpResponseMessage> handler)
+    protected async Task RunWithMinioClientAsync(Action<HttpRequestMessage, HttpResponseMessage> handler, Func<IMinioClient, Task> func, bool withPolicy = false)
     {
+        ArgumentNullException.ThrowIfNull(func);
+        
         var options = Options.Create(new ClientOptions
         {
             EndPoint = new Uri(MinioEndPoint)
@@ -30,8 +33,21 @@ public abstract class MinioUnitTests
         var timeProvider = new StaticTimeProvider(CurrentTime);
         var authLogger = NullLoggerFactory.Instance.CreateLogger<V4RequestAuthenticator>();
         var authenticator = new V4RequestAuthenticator(credentialsProvider, timeProvider, authLogger);
-        using var httpClientFactory = new TestHttpClientFactory(handler);
-        var logger = NullLoggerFactory.Instance.CreateLogger<MinioClient>();
-        return new MinioClient(options, timeProvider, authenticator, httpClientFactory, logger);
+        DelegatingHandler messageHandler = new MockHttpMessageHandler(handler);
+        if (withPolicy)
+        {
+            messageHandler = new PolicyHttpMessageHandler(MinioClientBuilder.GetRetryPolicy())
+            {
+                InnerHandler = messageHandler
+            };
+        }
+
+        using (messageHandler)
+        {
+            using var httpClientFactory = new TestHttpClientFactory(messageHandler);
+            var logger = NullLoggerFactory.Instance.CreateLogger<MinioClient>();
+            var client = new MinioClient(options, timeProvider, authenticator, httpClientFactory, logger);
+            await func(client).ConfigureAwait(false);
+        }
     }
 }

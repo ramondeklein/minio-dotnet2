@@ -5,19 +5,19 @@ namespace Minio.UnitTests.Tests;
 
 public class VerificationTests
 {
-    public static readonly IEnumerable<object[]> BucketNames = new[]
-    {
-        new object[] {"docexamplebucket1", true},
-        new object[] {"log-delivery-march-2020", true},
-        new object[] {"my-hosted-content", true},
-        new object[] {"docexamplewebsite.com", true},
-        new object[] {"www.docexamplewebsite.com", true},
-        new object[] {"my.example.s3.bucket", true},
-        
-        new object[] {"doc_example_bucket", false},
-        new object[] {"DocExampleBucket", false},
-        new object[] {"doc-example-bucket-", false},
-    };
+    public static readonly IEnumerable<object[]> BucketNames =
+    [
+        ["docexamplebucket1", true],
+        ["log-delivery-march-2020", true],
+        ["my-hosted-content", true],
+        ["docexamplewebsite.com", true],
+        ["www.docexamplewebsite.com", true],
+        ["my.example.s3.bucket", true],
+
+        ["doc_example_bucket", false],
+        ["DocExampleBucket", false],
+        ["doc-example-bucket-", false]
+    ];
 
     [Theory]
     [MemberData(nameof(BucketNames))]

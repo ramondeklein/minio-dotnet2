@@ -16,16 +16,17 @@ public class BucketNotificationTests
 {
     private sealed class BucketNotificationEventDeserializer : INatsDeserialize<BucketNotificationEvent>
     {
+        #pragma warning disable CA1822  // interface implementation cannot be static
         public BucketNotificationEvent? Deserialize(in ReadOnlySequence<byte> buffer)
             => JsonSerializer.Deserialize<BucketNotificationEvent>(buffer.FirstSpan);
+        #pragma warning restore CA1822
     }
 
     [Fact]
     public async Task TestBucketNotificationsViaNats()
     {
         // Start NATS container
-        await using var natsContainer = new NatsBuilder()
-            .WithImage("nats:2.10")
+        await using var natsContainer = new NatsBuilder(Images.Nats)
             .WithExposedPort(4222)
             .Build();
         await natsContainer.StartAsync().ConfigureAwait(true);
@@ -42,13 +43,13 @@ public class BucketNotificationTests
             using var natsSubscription = natsObservable.Subscribe(e => tsc.TrySetResult(e.Data!));
 
             // Start MinIO container with proper NATS configuration
-            await using var minioContainer = new MinioBuilder()
-                .WithImage("quay.io/minio/minio:latest")
+            await using var minioContainer = new MinioBuilder(Images.AIStor)
                 .WithEnvironment(new Dictionary<string, string>
                 {
-                    { $"MINIO_NOTIFY_NATS_ENABLE_{natsIdentifier}", "on" },
-                    { $"MINIO_NOTIFY_NATS_ADDRESS_{natsIdentifier}", $"{natsContainer.IpAddress}:4222" },
-                    { $"MINIO_NOTIFY_NATS_SUBJECT_{natsIdentifier}", natsSubject },
+                    ["MINIO_LICENSE"] = License.Minio,
+                    [$"MINIO_NOTIFY_NATS_ENABLE_{natsIdentifier}"] = "on",
+                    [$"MINIO_NOTIFY_NATS_ADDRESS_{natsIdentifier}"] = $"{natsContainer.IpAddress}:4222",
+                    [$"MINIO_NOTIFY_NATS_SUBJECT_{natsIdentifier}"] = natsSubject,
                 })
                 .Build();
             await minioContainer.StartAsync().ConfigureAwait(true);
@@ -127,8 +128,8 @@ public class BucketNotificationTests
     public async Task TestMinioBucketNotifications()
     {
         // Start MinIO container
-        await using var minioContainer = new MinioBuilder()
-            .WithImage("quay.io/minio/minio:latest")
+        await using var minioContainer = new MinioBuilder(Images.AIStor)
+            .WithEnvironment("MINIO_LICENSE", License.Minio)
             .Build();
         await minioContainer.StartAsync().ConfigureAwait(true);
 
@@ -143,14 +144,8 @@ public class BucketNotificationTests
         await client.CreateBucketAsync(bucketName).ConfigureAwait(true);
 
         var tsc = new TaskCompletionSource<NotificationEvent>();
-        var bucketNotifications = client.ListenBucketNotificationsAsync(bucketName, EventType.ObjectCreatedAll); 
-        using var subscription = bucketNotifications.ToObservable().Subscribe(e => tsc.TrySetResult(e));
-        
-        // Wait a small delay, because listening for bucket events is an async
-        // operation too and isn't confirmed. It will only return after the
-        // first ping (10 seconds). The only solution is to wait a little to
-        // ensure the command has been processed.
-        await Task.Delay(50).ConfigureAwait(true);
+        var bucketNotifications = await client.ListenBucketNotificationsAsync(bucketName, EventType.ObjectCreatedAll).ConfigureAwait(true); 
+        using var subscription = bucketNotifications.Subscribe(e => tsc.TrySetResult(e));
 
         // Write the object
         var testData = "Hello world"u8.ToArray();

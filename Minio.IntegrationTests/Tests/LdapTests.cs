@@ -9,9 +9,8 @@ using Xunit;
 
 namespace Minio.IntegrationTests.Tests;
 
-public class LDAPTests
+public class LdapTests
 {
-    
     private class DefaultHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new();
@@ -54,7 +53,7 @@ public class LDAPTests
     public async Task TestWebIdentityLogin()
     {
         // Start Keycloak container
-        await using var keycloakContainer = new KeycloakBuilder()
+        await using var keycloakContainer = new KeycloakBuilder(Images.Keycloak)
             .WithHostname("keycloak")
             .WithExposedPort(KeycloakBuilder.KeycloakPort)
             .Build();
@@ -86,8 +85,7 @@ public class LDAPTests
             ["directAccessGrantsEnabled"] = false,
             ["name"] = "Minio client",
             ["protocol"] = "openid-connect",
-            ["publicClient"] = false,
-            ["serviceAccountsEnabled"] = true,
+            ["publicClient"] = false, ["serviceAccountsEnabled"] = true,
             ["attributes"] = new Dictionary<string, object>
             {
                 { "access.token.lifespan", 3600 }
@@ -95,7 +93,7 @@ public class LDAPTests
         };
         using (var json = Json(client))
         {
-            var newClientResponse = await keycloakClient.PostAsync($"/admin/realms/{realmName}/clients", json);
+            var newClientResponse = await keycloakClient.PostAsync(new Uri($"/admin/realms/{realmName}/clients", UriKind.Relative), json);
             Assert.True(newClientResponse.IsSuccessStatusCode, "Failed to create client");
         }
 
@@ -116,14 +114,14 @@ public class LDAPTests
         };
         using (var json = Json(protocolMapper))
         {
-            var newClientResponse = await keycloakClient.PostAsync($"/admin/realms/{realmName}/clients/{clientId}/protocol-mappers/models", json);
+            var newClientResponse = await keycloakClient.PostAsync(new Uri($"/admin/realms/{realmName}/clients/{clientId}/protocol-mappers/models", UriKind.Relative), json);
             Assert.True(newClientResponse.IsSuccessStatusCode, "Failed to create client protocol mapper");
         }
         
-        await using var minioContainer = new MinioBuilder()
-            .WithImage("quay.io/minio/minio:latest")
+        await using var minioContainer = new MinioBuilder(Images.AIStor)
             .WithEnvironment(new Dictionary<string, string>
             {
+                ["MINIO_LICENSE"] = License.Minio,
                 ["MINIO_IDENTITY_OPENID_CONFIG_URL"] = $"http://{keycloakContainer.IpAddress}:8080/realms/{realmName}/.well-known/openid-configuration",
                 ["MINIO_IDENTITY_OPENID_CLIENT_ID"] = clientName,
                 ["MINIO_IDENTITY_OPENID_CLIENT_SECRET"] = clientSecret,
@@ -134,23 +132,21 @@ public class LDAPTests
             .Build();
         await minioContainer.StartAsync();
 
+        var httpClientFactory = new DefaultHttpClientFactory();
+        var keycloakAccessTokenProvider = new KeycloakAccessTokenProvider(keycloakContainer.GetBaseAddress(), realmName, clientName, clientSecret);
+        var webIdentityOptions = new WebIdentityCredentialsOptions { StsEndPoint = minioContainer.GetConnectionString() };
+        var identityProvider = new WebIdentityProvider(httpClientFactory, keycloakAccessTokenProvider, Options.Create(webIdentityOptions));
         var minioClient = new MinioClientBuilder(minioContainer.GetConnectionString())
-            .WithCredentialsProvider(new WebIdentityProvider(new DefaultHttpClientFactory(), new KeycloakAccessTokenProvider(keycloakContainer.GetBaseAddress(), realmName, clientName, clientSecret), Options.Create(new WebIdentityCredentialsOptions
-            {
-                StsEndPoint = minioContainer.GetConnectionString()
-            })))
+            .WithCredentialsProvider(identityProvider)
             .Build();
 
-        await foreach (var bucket in minioClient.ListBucketsAsync())
-        {
-            // NOP
-        };
+        await minioClient.ListBucketsAsync().CountAsync();
     }
 
     public static async Task<HttpClient> GetKeycloakClientAsync(string endpoint, string username, string password, string realm = "master", CancellationToken cancellationToken = default)
     {
         using var client = new HttpClient();
-        var tokenEndpoint = new Uri($"{endpoint}/realms/{realm}/protocol/openid-connect/token");
+        var tokenEndpoint = new Uri($"{endpoint}/realms/{realm}/protocol/openid-connect/token", UriKind.Absolute);
         using var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["client_id"] = "admin-cli", 
@@ -169,5 +165,5 @@ public class LDAPTests
         };
     }
 
-    private static HttpContent Json(object obj) => new StringContent(JsonSerializer.Serialize(obj), Encoding.UTF8, "application/json");
+    private static StringContent Json(object obj) => new(JsonSerializer.Serialize(obj), Encoding.UTF8, "application/json");
 }

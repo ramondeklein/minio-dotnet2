@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -74,12 +75,25 @@ public sealed class MinioClientBuilder
     
     internal static AsyncRetryPolicy<HttpResponseMessage> GetRetryPolicy()
     {
-        return HttpPolicyExtensions
-            .HandleTransientHttpError()
-            .WaitAndRetryAsync(Backoff.DecorrelatedJitterBackoffV2(
-                medianFirstRetryDelay: TimeSpan.FromMilliseconds(250),
-                retryCount: 5
-            ));
+        return Policy<HttpResponseMessage>.Handle<HttpRequestException>().OrResult(resp =>
+        {
+            switch (resp.StatusCode)
+            {
+                case HttpStatusCode.RequestTimeout /* 408 */:
+                case HttpStatusCode.Locked /* 423 */:
+                case HttpStatusCode.TooManyRequests /* 429 */:
+                case HttpStatusCode.InternalServerError /* 500 */:
+                case HttpStatusCode.BadGateway /* 502 */:
+                case HttpStatusCode.ServiceUnavailable /* 503 */:
+                case HttpStatusCode.GatewayTimeout /* 504 */: 
+                    return true;
+            }
+            return false;
+        }).WaitAndRetryAsync(Backoff.DecorrelatedJitterBackoffV2(
+            medianFirstRetryDelay: TimeSpan.FromMilliseconds(250),
+            retryCount: 5
+        ));
+
     }
     
     private sealed class HttpClientFactory : IHttpClientFactory

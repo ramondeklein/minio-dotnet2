@@ -11,8 +11,8 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // Configure logging
 builder.Logging
-    .AddSimpleConsole(opt => opt.SingleLine = true) 
-    .SetMinimumLevel(LogLevel.Warning);
+    .AddSimpleConsole(/*opt => opt.SingleLine = true*/) 
+    .SetMinimumLevel(LogLevel.Debug);
 
 // Add Minio
 builder.Services
@@ -32,15 +32,15 @@ if (!hasBucket)
     await minioClient.CreateBucketAsync(testBucket).ConfigureAwait(false);
 
 // Listen for all bucket events
-using var subscription = minioClient
-    .ListenBucketNotificationsAsync(testBucket, new[]
-    {
+var observable = await minioClient
+    .ListenBucketNotificationsAsync(testBucket, [
         EventType.ObjectCreatedAll,
         EventType.ObjectAccessedAll,
-        EventType.ObjectRemovedAll,
-    })
-    .ToObservable()
-    .Subscribe(e => Console.WriteLine($"{e.S3.Bucket.Name}:{e.S3.Object.Key} - {e.EventName}"));
+        EventType.ObjectRemovedAll
+    ])
+    .ConfigureAwait(false);
+
+using var subscription = observable.Subscribe(e => Console.WriteLine($"{e.S3.Bucket.Name}:{e.S3.Object.Key} - {e.EventName}"));
 
 // Write out 100 objects in parallel
 var buffer = new byte[256];
@@ -57,14 +57,13 @@ await Task.WhenAll(Enumerable.Range(0, 100).Select(i => $"test-{i:D04}").Select(
 })).ConfigureAwait(false);
 
 // Read an object file
-var (stream, objectInfo) = await minioClient.GetObjectAsync(testBucket, "test-0000").ConfigureAwait(false);
+var (stream, _) = await minioClient.GetObjectAsync(testBucket, "test-0000").ConfigureAwait(false);
 await using (stream.ConfigureAwait(false))
 {
     // TODO: Do something with the stream
-    _ = stream;
 }
 
 // List all objects starting with "test-" in the test-bucket
 // (max 20 objects at a time)
-await foreach (var objItem in minioClient.ListObjectsAsync(testBucket, prefix: "test-", delimiter: "/", pageSize: 20))
+await foreach (var objItem in minioClient.ListObjectsAsync(testBucket, prefix: "test-", delimiter: "/", pageSize: 20).ConfigureAwait(false))
     Console.WriteLine($"{objItem.Key,-40} {objItem.Size,10} bytes, etag: {objItem.ETag}");

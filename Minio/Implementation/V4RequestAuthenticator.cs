@@ -13,7 +13,7 @@ using SHA256 = Shims.SHA256;
 
 namespace Minio.Implementation;
 
-internal partial class V4RequestAuthenticator : IRequestAuthenticator
+public partial class V4RequestAuthenticator : IRequestAuthenticator
 {
     private static readonly KeyOnlySort KeyOnlySorter = new();
     private readonly ICredentialsProvider _credentialsProvider;

@@ -1,6 +1,9 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Reactive.Concurrency;
+using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -47,7 +50,6 @@ internal class MinioClient : IMinioClient
         "X-Amz-Tagging-Count",
         "X-Amz-Meta-",
     };
-
     
     private const long MaxMultipartPutObjectSize = 5L * 1024 * 1024 * 1024 * 1024; // 5TiB
     private const long MinPartSize = 16 * 1024 * 1024;  // 16MiB
@@ -57,6 +59,7 @@ internal class MinioClient : IMinioClient
     private readonly IRequestAuthenticator _requestAuthenticator;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<MinioClient> _logger;
+    private int _requestId;
 
     public MinioClient(IOptions<ClientOptions> options, ITimeProvider timeProvider, IRequestAuthenticator requestAuthenticator, IHttpClientFactory httpClientFactory, ILogger<MinioClient> logger)
     {
@@ -82,7 +85,7 @@ internal class MinioClient : IMinioClient
         if (objectLocking)
             req.Headers.Add("X-Amz-Bucket-Object-Lock-Enabled", "true");
 
-        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
         return resp.GetHeaderValue("Location") ?? "";
     }
 
@@ -91,7 +94,7 @@ internal class MinioClient : IMinioClient
         VerifyBucketName(bucketName);
         
         using var req = CreateRequest(HttpMethod.Delete, bucketName);
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<bool> BucketExistsAsync(string bucketName, CancellationToken cancellationToken)
@@ -101,7 +104,7 @@ internal class MinioClient : IMinioClient
         try
         {
             using var req = CreateRequest(HttpMethod.Head, bucketName);
-            await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (MinioHttpException exc) when (exc.Response.StatusCode == HttpStatusCode.NotFound)
@@ -113,7 +116,7 @@ internal class MinioClient : IMinioClient
     public async IAsyncEnumerable<BucketInfo> ListBucketsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         using var req = CreateRequest(HttpMethod.Get, string.Empty);
-        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
@@ -142,7 +145,7 @@ internal class MinioClient : IMinioClient
         try
         {
             using var req = CreateRequest(HttpMethod.Get, bucketName, query);
-            var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
             var tags = new Dictionary<string, string>();
             if (resp.StatusCode == HttpStatusCode.OK)
@@ -192,12 +195,12 @@ internal class MinioClient : IMinioClient
             var xTagging = new XElement(Ns + "Tagging", xTagSet);
 
             using var req = CreateRequest(HttpMethod.Put, bucketName, xTagging, query);
-            await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             using var req = CreateRequest(HttpMethod.Delete, bucketName, query);
-            await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -227,7 +230,7 @@ internal class MinioClient : IMinioClient
 
         options?.ServerSideEncryption?.WriteHeaders(req.Headers);
     
-        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         var abortDate = DateTimeOffset.TryParseExact(resp.Headers.TryGetValue("X-Amz-Abort-Date"), "R", CultureInfo.InvariantCulture, DateTimeStyles.None, out var ad) ? (DateTimeOffset?)ad : null;
         var abortRuleId = resp.Headers.TryGetValue("X-Amz-Abort-Rule-Id");
@@ -267,7 +270,7 @@ internal class MinioClient : IMinioClient
             .SetContentMD5(options?.ContentMD5)
             .SetChecksum(options?.ChecksumAlgorithm, options?.Checksum);
     
-        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         return new UploadPartResult
         {
@@ -315,7 +318,7 @@ internal class MinioClient : IMinioClient
         }
 
         using var req = CreateRequest(HttpMethod.Post, Encode(bucketName, key), xml, query);
-        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
@@ -343,7 +346,7 @@ internal class MinioClient : IMinioClient
         query.Add("uploadId", uploadId);
 
         using var req = CreateRequest(HttpMethod.Delete, Encode(bucketName, key), query);
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task PutObjectAsync(string bucketName, string key, Stream stream, PutObjectOptions? options, ProgressHandler? progress, CancellationToken cancellationToken)
@@ -380,7 +383,7 @@ internal class MinioClient : IMinioClient
             
         options?.ServerSideEncryption?.WriteHeaders(req.Headers);
     
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ObjectInfo> HeadObjectAsync(string bucketName, string key, GetObjectOptions? options = null, CancellationToken cancellationToken = default)
@@ -414,10 +417,10 @@ internal class MinioClient : IMinioClient
         req.SetBypassGovernanceRetention(bypassGovernanceRetention)
             .SetExpectedBucketOwner(expectedBucketOwner)
             .SetMfa(mfa);
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task DeleteObjectsAsync(string bucketName, IEnumerable<KeyAndVersion> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, CancellationToken cancellationToken)
+    public async Task DeleteObjectsAsync(string bucketName, IEnumerable<ObjectIdentifier> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, CancellationToken cancellationToken)
     {
         var deleteObjects = InternalDeleteObjectsAsync(bucketName, objects, bypassGovernanceRetention, expectedBucketOwner, mfa, true, cancellationToken);
         await foreach (var _ in deleteObjects.ConfigureAwait(false))
@@ -426,12 +429,12 @@ internal class MinioClient : IMinioClient
         }
     }
     
-    public IAsyncEnumerable<DeleteResult> DeleteObjectsVerboseAsync(string bucketName, IEnumerable<KeyAndVersion> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, CancellationToken cancellationToken)
+    public IAsyncEnumerable<DeleteResult> DeleteObjectsVerboseAsync(string bucketName, IEnumerable<ObjectIdentifier> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, CancellationToken cancellationToken)
     {
         return InternalDeleteObjectsAsync(bucketName, objects, bypassGovernanceRetention, expectedBucketOwner, mfa, false, cancellationToken);
     }
     
-    private async IAsyncEnumerable<DeleteResult> InternalDeleteObjectsAsync(string bucketName, IEnumerable<KeyAndVersion> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, bool quiet, [EnumeratorCancellation] CancellationToken cancellationToken)
+    private async IAsyncEnumerable<DeleteResult> InternalDeleteObjectsAsync(string bucketName, IEnumerable<ObjectIdentifier> objects, bool bypassGovernanceRetention, string? expectedBucketOwner, string? mfa, bool quiet, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         VerifyBucketName(bucketName);
         ArgumentNullException.ThrowIfNull(objects);
@@ -457,7 +460,13 @@ internal class MinioClient : IMinioClient
                 var obj = enumerator.Current;
                 var xObject = new XElement(Ns + "Object", new XElement(Ns + "Key", obj.Key));
                 if (obj.VersionId != null)
-                    xObject.Add(Ns + "VersionId", obj.VersionId);
+                    xObject.Add(new XElement(Ns + "VersionId", obj.VersionId));
+                if (!string.IsNullOrEmpty(obj.ETag))
+                    xObject.Add(new XElement(Ns + "ETag", obj.ETag));
+                if (obj.LastModifiedTime != null)
+                    xObject.Add(new XElement(Ns + "LastModifiedTime", obj.LastModifiedTime));
+                if (obj.Size != null)
+                    xObject.Add(new XElement(Ns + "Size", obj.Size));
                 xDelete.Add(xObject);
                 ++items;
             }
@@ -479,38 +488,41 @@ internal class MinioClient : IMinioClient
                     resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
                 }
                 
-                if (!quiet)
+                using (resp)
                 {
-                    var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                    var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
-
-                    foreach (var xResult in xResponse.Root!.Elements().Where(x => x.Name.Namespace == Ns))
+                    if (!quiet)
                     {
-                        switch (xResult.Name.LocalName)
+                        var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                        var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
+
+                        foreach (var xResult in xResponse.Root!.Elements().Where(x => x.Name.Namespace == Ns))
                         {
-                            case "Deleted":
+                            switch (xResult.Name.LocalName)
                             {
-                                var key = xResult.Element(Ns + "Key")?.Value ?? string.Empty;
-                                var versionIdText = xResult.Element(Ns + "VersionId")?.Value;
-                                var versionId = !string.IsNullOrEmpty(versionIdText) ? versionIdText : null; 
-                                var deleteMarkerText = xResult.Element(Ns + "DeleteMarker")?.Value;
-                                var deleteMarker = deleteMarkerText != null ? bool.TryParse(deleteMarkerText, out var dm) ? (bool?)dm : null : null;
-                                var deleteMarkerVersionIdText = xResult.Element(Ns + "DeleteMarker")?.Value;
-                                var deleteMarkerVersionId = !string.IsNullOrEmpty(deleteMarkerVersionIdText) ? deleteMarkerVersionIdText : null;
-                                yield return new DeleteResult(key, versionId, deleteMarker, deleteMarkerVersionId);
-                                break;
-                            }
-                            case "Error":
-                            {
-                                var key = xResult.Element(Ns + "Key")?.Value ?? string.Empty;
-                                var versionIdText = xResult.Element(Ns + "VersionId")?.Value;
-                                var versionId = !string.IsNullOrEmpty(versionIdText) ? versionIdText : null; 
-                                var errorCodeText = xResult.Element(Ns + "Code")?.Value;
-                                var errorCode = !string.IsNullOrEmpty(errorCodeText) ? errorCodeText : null; 
-                                var errorMessageText = xResult.Element(Ns + "Message")?.Value;
-                                var errorMessage = !string.IsNullOrEmpty(errorMessageText) ? errorMessageText : null; 
-                                yield return new DeleteResult(key, versionId, ErrorCode: errorCode, ErrorMessage: errorMessage);
-                                break;
+                                case "Deleted":
+                                {
+                                    var key = xResult.Element(Ns + "Key")?.Value ?? string.Empty;
+                                    var versionIdText = xResult.Element(Ns + "VersionId")?.Value;
+                                    var versionId = !string.IsNullOrEmpty(versionIdText) ? versionIdText : null;
+                                    var deleteMarkerText = xResult.Element(Ns + "DeleteMarker")?.Value;
+                                    var deleteMarker = deleteMarkerText != null ? bool.TryParse(deleteMarkerText, out var dm) ? (bool?)dm : null : null;
+                                    var deleteMarkerVersionIdText = xResult.Element(Ns + "DeleteMarker")?.Value;
+                                    var deleteMarkerVersionId = !string.IsNullOrEmpty(deleteMarkerVersionIdText) ? deleteMarkerVersionIdText : null;
+                                    yield return new DeleteResult(key, versionId, deleteMarker, deleteMarkerVersionId);
+                                    break;
+                                }
+                                case "Error":
+                                {
+                                    var key = xResult.Element(Ns + "Key")?.Value ?? string.Empty;
+                                    var versionIdText = xResult.Element(Ns + "VersionId")?.Value;
+                                    var versionId = !string.IsNullOrEmpty(versionIdText) ? versionIdText : null;
+                                    var errorCodeText = xResult.Element(Ns + "Code")?.Value;
+                                    var errorCode = !string.IsNullOrEmpty(errorCodeText) ? errorCodeText : null;
+                                    var errorMessageText = xResult.Element(Ns + "Message")?.Value;
+                                    var errorMessage = !string.IsNullOrEmpty(errorMessageText) ? errorMessageText : null;
+                                    yield return new DeleteResult(key, versionId, ErrorCode: errorCode, ErrorMessage: errorMessage);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -580,8 +592,8 @@ internal class MinioClient : IMinioClient
             q.AddIfNotNullOrEmpty("prefix", prefix);
             q.AddIfNotNullOrEmpty("start-after", startAfter);
             using var req = CreateRequest(HttpMethod.Get, bucketName, q);
-
-            var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            
+            using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
             var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
@@ -641,7 +653,7 @@ internal class MinioClient : IMinioClient
             q.AddIfNotNullOrEmpty("uploadId", uploadId);
             using var req = CreateRequest(HttpMethod.Get, Encode(bucketName, key), q);
 
-            var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
             var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
@@ -684,7 +696,7 @@ internal class MinioClient : IMinioClient
             q.AddIfNotNullOrEmpty("upload-id-marker", uploadIdMarker);
             using var req = CreateRequest(HttpMethod.Get, bucketName, q);
 
-            var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
             var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
@@ -715,7 +727,7 @@ internal class MinioClient : IMinioClient
         query.Add("notification", string.Empty);
         
         using var req = CreateRequest(HttpMethod.Get, bucketName, query);
-        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
@@ -733,10 +745,10 @@ internal class MinioClient : IMinioClient
         var xml = bucketNotification.Serialize();
         
         using var req = CreateRequest(HttpMethod.Put, bucketName, xml, query);
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
 
-    public async IAsyncEnumerable<NotificationEvent> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix, string suffix, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async Task<IObservable<NotificationEvent>> ListenBucketNotificationsAsync(string bucketName, IEnumerable<EventType> events, string prefix, string suffix, CancellationToken cancellationToken)
     {
         VerifyBucketName(bucketName);
         if (events == null) throw new System.ArgumentNullException(nameof(events));
@@ -758,30 +770,35 @@ internal class MinioClient : IMinioClient
 
         using var req = CreateRequest(HttpMethod.Get, bucketName, query);
         var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
-
         var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using (responseBody.ConfigureAwait(false))
-        {
-            using var sr = new StreamReader(responseBody);
-            while (!sr.EndOfStream)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-#if NET7_0_OR_GREATER
-                var line = await sr.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-#else
-                var line = await sr.ReadLineAsync().ConfigureAwait(false);
-#endif
-                if (string.IsNullOrEmpty(line))
-                    break;
 
-                var bucketNotificationEvent = JsonSerializer.Deserialize<BucketNotificationEvent>(line);
-                if (bucketNotificationEvent?.Records != null)
+        return Observable.Create<NotificationEvent>(async (obs, ct) =>
+        {
+            using (resp)
+            await using (responseBody.ConfigureAwait(false))
+            {
+                using var sr = new StreamReader(responseBody);
+                while (!sr.EndOfStream)
                 {
-                    foreach (var e in bucketNotificationEvent.Records)
-                        yield return e;
+                    ct.ThrowIfCancellationRequested();
+#if NET7_0_OR_GREATER
+                    var line = await sr.ReadLineAsync(ct).ConfigureAwait(false);
+#else
+                    var line = await sr.ReadLineAsync().ConfigureAwait(false);
+#endif
+                    if (string.IsNullOrEmpty(line))
+                        break;
+
+                    var bucketNotificationEvent = JsonSerializer.Deserialize<BucketNotificationEvent>(line);
+                    if (bucketNotificationEvent?.Records != null)
+                    {
+                        foreach (var e in bucketNotificationEvent.Records)
+                            obs.OnNext(e);
+                    }
                 }
+                obs.OnCompleted();
             }
-        }
+        }).SubscribeOn(TaskPoolScheduler.Default);
     }
 
     public async Task<ObjectLockConfiguration> GetObjectLockConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
@@ -794,7 +811,7 @@ internal class MinioClient : IMinioClient
         using var req = CreateRequest(HttpMethod.Get, bucketName, query);
         try
         {
-            var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+            using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
             var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
@@ -821,7 +838,7 @@ internal class MinioClient : IMinioClient
         var xml = config.Serialize();
         
         using var req = CreateRequest(HttpMethod.Put, bucketName, xml, query);
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
     
     public async Task<VersioningConfiguration> GetBucketVersioningAsync(string bucketName, CancellationToken cancellationToken)
@@ -832,7 +849,7 @@ internal class MinioClient : IMinioClient
         query.Add("versioning", string.Empty);
 
         using var req = CreateRequest(HttpMethod.Get, bucketName, query);
-        var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
 
         var responseBody = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         var xResponse = await XDocument.LoadAsync(responseBody, LoadOptions.None, cancellationToken).ConfigureAwait(false);
@@ -855,9 +872,9 @@ internal class MinioClient : IMinioClient
         query.Add("versioning", string.Empty);
 
         using var req = CreateRequest(HttpMethod.Put, bucketName, xml, query);
-        await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
+        using var resp = await SendRequestAsync(req, cancellationToken).ConfigureAwait(false);
     }
-    
+
     private async Task<HttpResponseMessage> SendRequestAsync(HttpRequestMessage req, CancellationToken cancellationToken)
     {
         if (req.Content != null)
@@ -875,35 +892,58 @@ internal class MinioClient : IMinioClient
         req.Headers.Add("X-Amz-Date", _timeProvider.UtcNow.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture));
         await _requestAuthenticator.AuthenticateAsync(req, _options.Value.Region, "s3", cancellationToken).ConfigureAwait(false);
 
+        
         using var httpClient = _httpClientFactory.CreateClient(_options.Value.MinioHttpClient);
-        var resp = await httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        if (!resp.IsSuccessStatusCode)
-        {
-            var xmlData = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(xmlData))
-            {
-                var xRoot = XDocument.Parse(xmlData).Root;
-                if (xRoot != null)
-                {
-                    var err = new ErrorResponse
-                    {
-                        Code = xRoot.Element("Code")?.Value ?? string.Empty,
-                        Message = xRoot.Element("Message")?.Value ?? string.Empty,
-                        BucketName = xRoot.Element("BucketName")?.Value ?? string.Empty,
-                        Key = xRoot.Element("Key")?.Value ?? string.Empty,
-                        Resource = xRoot.Element("Resource")?.Value ?? string.Empty,
-                        RequestId = xRoot.Element("RequestId")?.Value ?? string.Empty,
-                        HostId = xRoot.Element("HostId")?.Value ?? string.Empty,
-                        Region = xRoot.Element("Region")?.Value ?? string.Empty,
-                        Server = xRoot.Element("Server")?.Value ?? string.Empty,
-                    };
-                    throw new MinioHttpException(req, resp, err);
-                }
-            }
-            throw new MinioHttpException(req, resp, null);
-        }
+        var requestId = Interlocked.Increment(ref _requestId);
+        var sw = Stopwatch.StartNew();
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug("Request #{RequestID} {Method} {Url}", requestId, req.Method, req.RequestUri);
 
-        return resp;
+        try
+        {
+            var resp = await httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var responseData = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var contentType = resp.Content.Headers.ContentType?.MediaType;
+                if (contentType == "application/xml" && !string.IsNullOrEmpty(responseData))
+                {
+                    var xRoot = XDocument.Parse(responseData).Root;
+                    if (xRoot != null)
+                    {
+                        var err = new ErrorResponse
+                        {
+                            Code = xRoot.Element("Code")?.Value ?? string.Empty,
+                            Message = xRoot.Element("Message")?.Value ?? string.Empty,
+                            BucketName = xRoot.Element("BucketName")?.Value ?? string.Empty,
+                            Key = xRoot.Element("Key")?.Value ?? string.Empty,
+                            Resource = xRoot.Element("Resource")?.Value ?? string.Empty,
+                            RequestId = xRoot.Element("RequestId")?.Value ?? string.Empty,
+                            HostId = xRoot.Element("HostId")?.Value ?? string.Empty,
+                            Region = xRoot.Element("Region")?.Value ?? string.Empty,
+                            Server = xRoot.Element("Server")?.Value ?? string.Empty,
+                        };
+                        if (_logger.IsEnabled(LogLevel.Debug))
+                            _logger.LogDebug("Response #{RequestID} failed {StatusCode} - {Code}: {Message} ({Duration})", requestId, resp.StatusCode, err.Code, err.Message, sw.Elapsed);
+                        throw new MinioHttpException(req, resp, err);
+                    }
+                }
+
+                if (_logger.IsEnabled(LogLevel.Debug))
+                    _logger.LogDebug("Response #{RequestID} failed {StatusCode} ({Duration})", requestId, resp.StatusCode, sw.Elapsed);
+                throw new MinioHttpException(req, resp, null);
+            }
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+                _logger.LogDebug("Response #{RequestID} {StatusCode} ({Duration})", requestId, resp.StatusCode, sw.Elapsed);
+            return resp;
+        }
+        catch (Exception exc)
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+                _logger.LogDebug(exc, "Response #{RequestID} threw an exception ({Duration})", requestId, sw.Elapsed);
+            throw;
+        }
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string path, QueryParams? queryParameters = null)
